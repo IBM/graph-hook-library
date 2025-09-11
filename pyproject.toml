@@ -57,6 +57,3 @@ args = [
     "-DGHL_SERIALIZATION=ON",
     "-DGHL_BINDINGS=ON"
 ]
-
-[tool.py-build-cmake.stubgen]
-modules = ["graph_hook_library"]
