@@ -6,6 +6,7 @@
   <h1>Graph Hook Library (GHL)</h1>
 </div>
 Is a standalone C++ header-only generic graph library built upon the Boost Graph Library.
+<p></p>
 
 
 > The primary feature of the GHL is to provide a robust environment for developing and applying graph transformations or isomorphisms. These isomorphisms can either be contingent on the properties of the graph, such as the edge in or out degree of vertices, or con the subclassed properties of the vertex, such as class type or the value of a class member.
@@ -41,6 +42,9 @@ When building a C++ project including the GHL, a number of optional features can
 2. `GHL_BINDINGS`: Enables python bindings using [pybind11](https://github.com/pybind/pybind11).
 
 To set these directly using CMake, the following commands can be used: `add_compile_definitions(GHL_SERIALIZATION)` and `add_compile_definitions(GHL_BINDINGS)`.
+
+## Documentation
+Some documentation for the C++ code is avaliable at [[here](https://ibm.github.io/graph-hook-library/)](https://ibm.github.io/graph-hook-library/). We plan to improve this and to add documentation for the Python bindings in due course.
 
 ## Isomorphism Framework Overview
 The isomorphism framework provides methods for:
