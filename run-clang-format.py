@@ -192,7 +192,7 @@ def run_clang_format_diff(args, file):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
-            **encoding_py3
+            **encoding_py3,
         )
     except OSError as exc:
         raise DiffError(
