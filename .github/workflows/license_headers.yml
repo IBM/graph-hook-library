@@ -21,4 +21,4 @@ jobs:
           go-version: '^1.13.1'
       - run: |
          go install github.com/google/addlicense@latest
-         addlicense . -c IBM -l MIT -check
+         addlicense -c "IBM" -l mit -check . 
