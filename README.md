@@ -44,7 +44,7 @@ When building a C++ project including the GHL, a number of optional features can
 To set these directly using CMake, the following commands can be used: `add_compile_definitions(GHL_SERIALIZATION)` and `add_compile_definitions(GHL_BINDINGS)`.
 
 ## Documentation
-Some documentation for the C++ code is avaliable at [[here](https://ibm.github.io/graph-hook-library/)](https://ibm.github.io/graph-hook-library/). We plan to improve this and to add documentation for the Python bindings in due course.
+Some documentation for the C++ code is avaliable at [https://ibm.github.io/graph-hook-library/](https://ibm.github.io/graph-hook-library/). We plan to improve this and to add documentation for the Python bindings in due course.
 
 ## Isomorphism Framework Overview
 The isomorphism framework provides methods for:
