@@ -1,0 +1,1033 @@
+diff --git a/libs/graph/include/boost/graph/vf3_sub_graph_iso.hpp b/libs/graph/include/boost/graph/vf3_sub_graph_iso.hpp
+new file mode 100644
+index 00000000..d5b25292
+--- /dev/null
++++ b/libs/graph/include/boost/graph/vf3_sub_graph_iso.hpp
+@@ -0,0 +1,1026 @@
++#ifndef BOOST_VF3_SUB_GRAPH_ISO_HPP
++#define BOOST_VF3_SUB_GRAPH_ISO_HPP
++
++#include <iostream>
++#include <iomanip>
++#include <iterator>
++#include <vector>
++#include <utility>
++
++#include <boost/assert.hpp>
++#include <boost/concept/assert.hpp>
++#include <boost/concept_check.hpp>
++#include <boost/graph/graph_utility.hpp>
++#include <boost/graph/graph_traits.hpp>
++#include <boost/graph/mcgregor_common_subgraphs.hpp> // for always_equivalent
++#include <boost/graph/named_function_params.hpp>
++#include <boost/type_traits/has_less.hpp>
++#include <boost/mpl/int.hpp>
++#include <boost/range/algorithm/sort.hpp>
++#include <boost/tuple/tuple.hpp>
++#include <boost/utility/enable_if.hpp>
++#include <boost/dynamic_bitset.hpp>
++#include <memory>
++
++#ifndef BOOST_GRAPH_ITERATION_MACROS_HPP
++#define BOOST_ISO_INCLUDED_ITER_MACROS // local macro, see bottom of file
++#include <boost/graph/iteration_macros.hpp>
++#endif
++namespace boost
++{
++
++namespace detail
++{
++    template < typename GraphSmall, typename GraphLarge,
++               typename SmallGraphVertexClassMap, typename LargeGraphVertexClassMap,
++               typename SubgraphIsoUserCallback ,
++               typename VertexEquivalencePredicate,
++               typename EdgeEquivalencePredicate >
++    class matcher;
++
++    template < typename GraphSmall_, typename GraphLarge_,
++               typename SmallGraphVertexClassMap_, typename LargeGraphVertexClassMap_,
++               typename SubgraphIsoUserCallback_ ,
++               typename VertexEquivalencePredicate_,
++               typename EdgeEquivalencePredicate_ >
++    class vf3_state
++    {
++
++        using LargeVertexType = typename graph_traits<GraphLarge_>::vertex_descriptor;
++        using SmallVertexType = typename graph_traits<GraphSmall_>::vertex_descriptor;
++
++        using ClassType = property_traits<LargeGraphVertexClassMap_>::value_type;
++
++        public:
++        vf3_state(): matcher_ptr(nullptr) {}
++        vf3_state(matcher<GraphSmall_, GraphLarge_, SmallGraphVertexClassMap_, LargeGraphVertexClassMap_, SubgraphIsoUserCallback_, VertexEquivalencePredicate_, EdgeEquivalencePredicate_>* m,
++                LargeVertexType v_large = graph_traits<GraphLarge_>::null_vertex(), SmallVertexType v_small = graph_traits<GraphSmall_>::null_vertex())
++        : v_large_(v_large)
++        , v_small_(v_small)
++        , matcher_ptr(m)
++        {
++            auto& matcher_ = *matcher_ptr;
++            depth_ = matcher_.core_large_.size();
++            if (v_large_ != graph_traits<GraphLarge_>::null_vertex() &&
++                v_small_ != graph_traits<GraphSmall_>::null_vertex())
++            {
++                matcher_.core_large_[v_large_] = v_small_;
++                matcher_.core_small_[v_small_] = v_large_;
++                depth_ = matcher_.core_large_.size();
++                auto v_large_index = matcher_.large_vertices_indices_[v_large_];
++                if (!matcher_.large_predecessors_[v_large_index])
++                {
++                    matcher_.large_predecessors_.set(v_large_index);
++                    new_predecessors_.push_back(v_large_index);
++                }
++                if (!matcher_.large_successors_[v_large_index])
++                {
++                    matcher_.large_successors_.set(v_large_index);
++                    new_successors_.push_back(v_large_index);
++                }
++                auto in_edge_it = boost::in_edges(v_large_, matcher_.graph_large_);
++                for(auto it = in_edge_it.first; it != in_edge_it.second; ++it)
++                {
++                    LargeVertexType pred = boost::source(*it, matcher_.graph_large_);
++                    auto pred_index = matcher_.large_vertices_indices_[pred];
++                    if(matcher_.core_large_.find(pred) == matcher_.core_large_.end() &&
++                        !matcher_.large_predecessors_[pred_index])
++                    {
++                        matcher_.large_predecessors_.set(pred_index);
++                        new_predecessors_.push_back(pred_index);
++                    }
++                }
++                auto out_edge_it = boost::out_edges(v_large_, matcher_.graph_large_);
++                for(auto it = out_edge_it.first; it != out_edge_it.second; ++it)
++                {
++                    LargeVertexType succ = target(*it, matcher_.graph_large_);
++                    auto succ_index = matcher_.large_vertices_indices_[succ];
++                    if(matcher_.core_large_.find(succ) == matcher_.core_large_.end() &&
++                        !matcher_.large_successors_[succ_index])
++                    {
++                        matcher_.large_successors_.set(succ_index);
++                        new_successors_.push_back(succ_index);
++                    }
++                }
++            } else if (v_large_ == graph_traits<GraphLarge_>::null_vertex() &&
++                        v_small_ == graph_traits<GraphSmall_>::null_vertex()) {
++                matcher_.core_small_.clear();
++                matcher_.core_large_.clear();
++                matcher_.large_successors_.reset();
++                matcher_.large_predecessors_.reset();
++            }
++        }
++
++        boost::dynamic_bitset<> get_class_nodes(ClassType cls, char code)
++        {
++            auto& matcher_ = *matcher_ptr;
++            if (code == 'p')
++            {
++                return (matcher_.large_predecessors_ & matcher_.graph_large_class_nodes_[cls]);
++            } else if (code == 's')
++            {
++                return (matcher_.large_successors_ & matcher_.graph_large_class_nodes_[cls]);
++            } else if (code == 'v')
++            {
++                boost::dynamic_bitset<> large_vertices(matcher_.num_large_vertices_);
++                large_vertices.set();
++                return (large_vertices & ~(matcher_.large_predecessors_ | matcher_.large_successors_) & matcher_.graph_large_class_nodes_[cls]);
++            } else {
++                BOOST_ASSERT_MSG(false, "Invalid code for class nodes retrieval");
++                return {};
++            }
++        }
++
++        void restore()
++        {
++            auto& matcher_ = *matcher_ptr;
++
++            if (v_large_ != graph_traits<GraphLarge_>::null_vertex() &&
++                v_small_ != graph_traits<GraphSmall_>::null_vertex())
++            {
++                matcher_.core_large_.erase(v_large_);
++                matcher_.core_small_.erase(v_small_);
++            }
++            for(const auto &pred: new_predecessors_)
++            {
++                matcher_.large_predecessors_.reset(pred);
++            }
++            for(const auto& succ: new_successors_)
++            {
++                matcher_.large_successors_.reset(succ);
++            }
++        }
++        ~vf3_state() { restore(); }
++        vf3_state(const vf3_state&) = delete;
++
++        matcher<GraphSmall_, GraphLarge_, SmallGraphVertexClassMap_, LargeGraphVertexClassMap_, SubgraphIsoUserCallback_, VertexEquivalencePredicate_, EdgeEquivalencePredicate_>* matcher_ptr;
++        LargeVertexType v_large_;
++        SmallVertexType v_small_;
++        size_t depth_;
++        std::vector<uint64_t> new_predecessors_;
++        std::vector<uint64_t> new_successors_;
++    }; // Class state
++
++    // TODO: Comment that the TYPES of the property maps must be the same
++    template < typename GraphLarge, typename GraphSmall,
++               typename SmallGraphVertexClassMap,
++               typename LargeGraphVertexClassMap,
++               typename SubgraphIsoUserCallback,
++               typename VertexEquivalencePredicate,
++               typename EdgeEquivalencePredicate>
++    class matcher
++    {
++        public:
++
++        using SmallVertexType = typename graph_traits<GraphSmall>::vertex_descriptor;
++        using SmallVertexIterator = typename graph_traits<GraphSmall>::vertex_iterator;
++
++        using LargeVertexType = typename graph_traits<GraphLarge>::vertex_descriptor;
++        using LargeVertexIterator = typename graph_traits<GraphLarge>::vertex_iterator;
++
++        using SmallClassType = typename property_traits<SmallGraphVertexClassMap>::value_type;
++        using LargeClassType = typename property_traits<LargeGraphVertexClassMap>::value_type;
++
++        using ClassType = typename property_traits<SmallGraphVertexClassMap>::value_type;
++
++        public:
++        matcher(const GraphSmall& graph_small,
++                const GraphLarge& graph_large,
++                const SmallGraphVertexClassMap& small_map,
++                const LargeGraphVertexClassMap& large_map,
++                SubgraphIsoUserCallback callback,
++                VertexEquivalencePredicate vertex_comp,
++                EdgeEquivalencePredicate edge_comp
++            )
++        : graph_small_(graph_small)
++        , graph_large_(graph_large)
++        , small_vertex_class_map_(small_map)
++        , large_vertex_class_map_(large_map)
++        , callback_(callback)
++        , vertex_comp_pred_(vertex_comp)
++        , edge_comp_pred_(edge_comp)
++        {
++            BOOST_STATIC_ASSERT(( is_same<SmallClassType, LargeClassType>::value ));
++
++            BOOST_ASSERT(num_vertices(graph_small) <= num_vertices(graph_large));
++            BOOST_ASSERT(num_edges(graph_small) <= num_edges(graph_large));
++
++            num_small_vertices_ = num_vertices(graph_small_);
++            num_large_vertices_ = num_vertices(graph_large_);
++
++            graph_small_vertices_.insert(vertices(graph_small).first,
++                vertices(graph_small).second);
++
++            graph_large_vertices_.insert(vertices(graph_large).first,
++                vertices(graph_large).second);
++
++            uint64_t small_vertex_index = 0;
++            uint64_t class_index = 0;
++
++            for(const SmallVertexType& node: graph_small_vertices_)
++            {
++                parents_[node] = graph_traits<GraphSmall>::null_vertex();
++                small_vertices_indices_[node] = small_vertex_index;
++                small_indices_vertices_[small_vertex_index] = node;
++                ClassType c = small_vertex_class_map_[node];
++                if(class_index_map_.find(c) == class_index_map_.end())
++                {
++                    class_index = class_index_map_.size();
++                    class_index_map_[c] = class_index;
++                }
++                if(graph_small_class_nodes_.find(c) == graph_small_class_nodes_.end())
++                {
++                    graph_small_class_nodes_[c] = dynamic_bitset<>(num_small_vertices_);
++                }
++                graph_small_class_nodes_[c].set(small_vertex_index);
++                ++small_vertex_index;
++            }
++            uint64_t large_vertex_index = 0;
++            for(const LargeVertexType& node: graph_large_vertices_)
++            {
++                large_vertices_indices_[node] = large_vertex_index;
++                large_indices_vertices_[large_vertex_index] = node;
++                ClassType c = large_vertex_class_map_[node];
++                if(class_index_map_.find(c) == class_index_map_.end())
++                {
++                    label_counts_[c] = 0;
++                    class_index = class_index_map_.size();
++                    class_index_map_[c] = class_index;
++                }
++                if(graph_large_class_nodes_.find(c) == graph_large_class_nodes_.end())
++                {
++                    graph_large_class_nodes_[c] = dynamic_bitset<>(num_large_vertices_);
++                }
++                graph_large_class_nodes_[c].set(large_vertex_index);
++                label_counts_[c]+=1;
++                ++large_vertex_index;
++            }
++            large_predecessors_.resize(num_large_vertices_);
++            large_predecessors_.reset();
++            large_successors_.resize(num_large_vertices_);
++            large_successors_.reset();
++
++            initialize();
++
++            state_ = vf3_state<GraphSmall, GraphLarge, SmallGraphVertexClassMap, LargeGraphVertexClassMap, SubgraphIsoUserCallback, VertexEquivalencePredicate, EdgeEquivalencePredicate>(this);
++            found_match_ = false;
++            stop_search_ = false;
++        }
++
++
++        void initialize()
++        {
++            order_graph_small_vertices();
++            preprocess();
++
++        }
++
++        bool match()
++        {
++            if(stop_search_)
++            {
++                return found_match_;
++            }
++            if(core_small_.size() == num_small_vertices_)
++            {
++                found_match_ = true;
++                if(!callback_(core_small_, core_large_))
++                {
++                    stop_search_ = true;
++                }
++                return true;
++            } else {
++                std::vector<std::pair<LargeVertexType, SmallVertexType>> pairs{};
++                candidate_pairs(pairs);
++                for(const auto& [v_large_next, v_small_next]: pairs)
++                {
++                    if (syntactic_feasibility(v_large_next, v_small_next))
++                    {
++                        vf3_state<GraphSmall, GraphLarge,
++                                  SmallGraphVertexClassMap,
++                                  LargeGraphVertexClassMap,
++                                  SubgraphIsoUserCallback,
++                                  VertexEquivalencePredicate,
++                                  EdgeEquivalencePredicate
++                        > new_state(this, v_large_next, v_small_next);
++
++                        if (match())
++                        {
++                            if(stop_search_)
++                            {
++                                return true;
++                            }
++                        }
++                    }
++                }
++            }
++            return found_match_;
++
++        }
++
++        void candidate_pairs(std::vector<std::pair<LargeVertexType, SmallVertexType>>& pairs)
++        {
++            size_t depth = core_small_.size();
++
++            SmallVertexType v_small_next;
++            LargeVertexType v_large_next;
++            if (state_.v_small_ != graph_traits<GraphSmall>::null_vertex() || depth < node_order_.size())
++            {
++                if(state_.v_small_ == graph_traits<GraphSmall>::null_vertex())
++                {
++                    v_small_next = node_order_[depth];
++                } else {
++                    v_small_next = state_.v_small_;
++                }
++                ClassType v_small_next_class = small_vertex_class_map_[v_small_next];
++                if (parents_[v_small_next] == graph_traits<GraphSmall>::null_vertex())
++                {
++                    for(const LargeVertexType& v_large_next: graph_large_vertices_)
++                    {
++                        if(core_large_.find(v_large_next) == core_large_.end() && large_vertex_class_map_[v_large_next] == v_small_next_class) {
++                            pairs.emplace_back(v_large_next, v_small_next);
++                        }
++                    }
++                } else {
++                    SmallVertexType v_small_parent = parents_[v_small_next];
++                    LargeVertexType v_large_parent = core_small_[v_small_parent];
++                    if (edge(v_small_next, v_small_parent, graph_small_).second && !edge(v_small_parent, v_small_next, graph_small_).second)
++                    {
++                        auto in_edge_it = boost::in_edges(v_large_parent, graph_large_);
++                        for(auto it = in_edge_it.first; it != in_edge_it.second; ++it){
++                            auto e = *it;
++                            LargeVertexType v_large_next = boost::source(e, graph_large_);
++                            if(core_large_.find(v_large_next) == core_large_.end() && large_vertex_class_map_[v_large_next] == v_small_next_class) {
++                                pairs.emplace_back(v_large_next, v_small_next);
++                            }
++                        }
++                    } else if (edge(v_small_parent, v_small_next, graph_small_).second && !edge(v_small_next, v_small_parent, graph_small_).second)
++                    {
++                        auto out_edge_it = boost::out_edges(v_large_parent, graph_large_);
++                        for(auto it = out_edge_it.first; it != out_edge_it.second; ++it)
++                        {
++                            auto e = *it;
++                            LargeVertexType v_large_next = boost::target(e, graph_large_);
++                            if (core_large_.find(v_large_next) == core_large_.end() && large_vertex_class_map_[v_large_next] == v_small_next_class)
++                            {
++                                pairs.emplace_back(v_large_next, v_small_next);
++                            }
++                        }
++                    } else if (edge(v_small_parent, v_small_next, graph_small_).second && edge(v_small_next, v_small_parent, graph_small_).second)
++                    {
++                        auto in_edge_it = boost::in_edges(v_large_parent, graph_large_);
++                        for(auto it = in_edge_it.first; it != in_edge_it.second; ++it)
++                        {
++                            auto e = *it;
++                            LargeVertexType v_large_next = boost::source(e, graph_large_);
++                            if (core_large_.find(v_large_next) == core_large_.end() && edge(v_large_parent, v_large_next, graph_large_).second && large_vertex_class_map_[v_large_next] == v_small_next_class)
++                            {
++                                pairs.emplace_back(v_large_next, v_small_next);
++                            }
++                        }
++                    }
++                }
++            }
++            return;
++        }
++
++        bool syntactic_feasibility(LargeVertexType v_large, SmallVertexType v_small)
++        {
++            if (small_vertex_class_map_[v_small] != large_vertex_class_map_[v_large])
++            {
++                return false;
++            }
++
++            if(!vertex_comp_pred_(v_small, v_large))
++            {
++                return false;
++            }
++
++            dynamic_bitset<> all_small_predecessors;
++            dynamic_bitset<> all_small_successors;
++            dynamic_bitset<> all_large_predecessors;
++            dynamic_bitset<> all_large_successors;
++
++            all_small_predecessors.resize(num_small_vertices_);
++            all_small_successors.resize(num_small_vertices_);
++            all_large_predecessors.resize(num_large_vertices_);
++            all_large_successors.resize(num_large_vertices_);
++
++            auto in_edge_it = boost::in_edges(v_small, graph_small_);
++            for(auto it = in_edge_it.first; it != in_edge_it.second; ++it)
++            {
++                SmallVertexType pred = boost::source(*it, graph_small_);
++                if(core_small_.find(pred) != core_small_.end())
++                {
++                    LargeVertexType mapped_node = core_small_[pred];
++                    auto edge = boost::edge(mapped_node, v_large, graph_large_);
++                    if(!edge.second)
++                    {
++                        return false;
++                    } else {
++                        if(!edge_comp_pred_(*it, edge.first))
++                        {
++                            return false;
++                        }
++                    }
++                }
++                all_small_predecessors.set(small_vertices_indices_[pred]);
++            }
++            auto out_edge_it = boost::out_edges(v_small, graph_small_);
++            for(auto it = out_edge_it.first; it != out_edge_it.second; ++it)
++            {
++                SmallVertexType succ = boost::target(*it, graph_small_);
++                if(core_small_.find(succ) != core_small_.end())
++                {
++                    LargeVertexType mapped_node = core_small_[succ];
++                    auto edge = boost::edge(v_large, mapped_node, graph_large_);
++                    if(!edge.second)
++                    {
++                        return false;
++                    } else {
++                        if(!edge_comp_pred_(*it, edge.first))
++                        {
++                            return false;
++                        }
++                    }
++                }
++                all_small_successors.set(small_vertices_indices_[succ]);
++            }
++            auto large_in_edge_it = boost::in_edges(v_large, graph_large_);
++            for(auto it = large_in_edge_it.first; it != large_in_edge_it.second; ++it)
++            {
++                LargeVertexType pred = boost::source(*it, graph_large_);
++                if(core_large_.find(pred) != core_large_.end())
++                {
++                    SmallVertexType mapped_node = core_large_[pred];
++                    auto edge = boost::edge(mapped_node, v_small, graph_small_);
++                    if(!edge.second)
++                    {
++                        return false;
++                    } else {
++                        if(!edge_comp_pred_(edge.first, *it))
++                        {
++                            return false;
++                        }
++                    }
++                }
++                all_large_predecessors.set(large_vertices_indices_[pred]);
++            }
++            auto large_out_edge_it = boost::out_edges(v_large, graph_large_);
++            for(auto it = large_out_edge_it.first; it != large_out_edge_it.second; ++it)
++            {
++                LargeVertexType succ = boost::target(*it, graph_large_);
++                if(core_large_.find(succ) != core_large_.end())
++                {
++                    SmallVertexType mapped_node = core_large_[succ];
++                    auto edge = boost::edge(v_small, mapped_node, graph_small_);
++                    if(!edge.second)
++                    {
++                        return false;
++                    } else {
++                        if(!edge_comp_pred_(edge.first, *it))
++                        {
++                            return false;
++                        }
++                    }
++                }
++                all_large_successors.set(large_vertices_indices_[succ]);
++            }
++
++            auto curr_depth = core_small_.size();
++
++            dynamic_bitset<> p_small_cls_nodes(num_small_vertices_);
++            dynamic_bitset<> s_small_cls_nodes(num_small_vertices_);
++            dynamic_bitset<> v_small_cls_nodes(num_small_vertices_);
++
++            dynamic_bitset<> p_large_cls_nodes(num_large_vertices_);
++            dynamic_bitset<> s_large_cls_nodes(num_large_vertices_);
++            dynamic_bitset<> v_large_cls_nodes(num_large_vertices_);
++
++            int i=0;
++
++            for(const auto& [cls, index]: class_index_map_)
++            {
++                p_small_cls_nodes = p_small_sets_[curr_depth] & graph_small_class_nodes_[cls];
++                p_large_cls_nodes = state_.get_class_nodes(cls, 'p');
++                if((p_small_cls_nodes & all_small_predecessors).count() > (p_large_cls_nodes & all_large_predecessors).count())
++                {
++                    return false;
++                }
++                if((p_small_cls_nodes & all_small_successors).count() > (p_large_cls_nodes & all_large_successors).count())
++                {
++                    return false;
++                }
++                s_small_cls_nodes = s_small_sets_[curr_depth] & graph_small_class_nodes_[cls];
++                s_large_cls_nodes = state_.get_class_nodes(cls, 's');
++                if((s_small_cls_nodes & all_small_predecessors).count() > (s_large_cls_nodes & all_large_predecessors).count())
++                {
++                    return false;
++                }
++                if((s_small_cls_nodes & all_small_successors).count() > (s_large_cls_nodes & all_large_successors).count())
++                {
++                    return false;
++                }
++                v_small_cls_nodes = v_small_sets_[curr_depth] & graph_small_class_nodes_[cls];
++                v_large_cls_nodes = state_.get_class_nodes(cls, 'v');
++                if((v_small_cls_nodes & all_small_predecessors).count() > (v_large_cls_nodes & all_large_predecessors).count())
++                {
++                    return false;
++                }
++                if((v_small_cls_nodes & all_small_successors).count() > (v_large_cls_nodes & all_large_successors).count())
++                {
++                    return false;
++                }
++
++                p_small_cls_nodes.reset();
++                s_small_cls_nodes.reset();
++                v_small_cls_nodes.reset();
++
++                p_large_cls_nodes.reset();
++                s_large_cls_nodes.reset();
++                v_large_cls_nodes.reset();
++            }
++            return true;
++        }
++
++        void preprocess()
++        {
++            uint64_t max_depth = node_order_.size();
++            p_small_sets_.assign(max_depth+1, dynamic_bitset<>(num_small_vertices_));
++            s_small_sets_.assign(max_depth+1, dynamic_bitset<>(num_small_vertices_));
++            v_small_sets_.assign(max_depth+1, dynamic_bitset<>(num_small_vertices_));
++
++            auto small_vertices = dynamic_bitset<>(num_small_vertices_);
++            small_vertices.set();
++            v_small_sets_[0] = small_vertices;
++
++            dynamic_bitset<> mapped_nodes;
++            dynamic_bitset<> all_predecessors;
++            dynamic_bitset<> all_successors;
++
++            mapped_nodes.resize(num_small_vertices_);
++            all_predecessors.resize(num_small_vertices_);
++            all_successors.resize(num_small_vertices_);
++
++            for(uint64_t depth=1; depth<=max_depth; ++depth)
++            {
++                mapped_nodes.set(small_vertices_indices_[node_order_[depth-1]]);
++                auto in_edges = boost::in_edges(node_order_[depth-1], graph_small_);
++                for(auto it = in_edges.first; it != in_edges.second; ++it)
++                {
++                    SmallVertexType pred = boost::source(*it, graph_small_);
++                    all_predecessors.set(small_vertices_indices_[pred]);
++                }
++                auto out_edges = boost::out_edges(node_order_[depth-1], graph_small_);
++                for(auto it = out_edges.first; it != out_edges.second; ++it)
++                {
++                    SmallVertexType succ = boost::target(*it, graph_small_);
++                    all_successors.set(small_vertices_indices_[succ]);
++                }
++                p_small_sets_[depth] = (small_vertices & (~mapped_nodes)) & all_predecessors;
++                s_small_sets_[depth] = (small_vertices & (~mapped_nodes)) & all_successors;
++                v_small_sets_[depth] = (small_vertices & ~(mapped_nodes | p_small_sets_[depth] | s_small_sets_[depth]));
++            }
++
++            auto p_small_cls_sets_map_ = std::unordered_map<ClassType, dynamic_bitset<>>();
++            auto s_small_cls_sets_map_ = std::unordered_map<ClassType, dynamic_bitset<>>();
++
++            for(uint64_t depth=0; depth<=max_depth; ++depth)
++            {
++                dynamic_bitset<> p_s_union_set(num_small_vertices_);
++                p_s_union_set = p_small_sets_[depth] | s_small_sets_[depth];
++                uint64_t pos = p_s_union_set.find_first();
++
++                while(pos != dynamic_bitset<>::npos)
++                {
++                    SmallVertexType node = small_indices_vertices_[pos];
++                    auto cls = small_vertex_class_map_[node];
++
++                    if(p_small_sets_[depth][pos])
++                    {
++                        if(p_small_cls_sets_map_.find(cls) == p_small_cls_sets_map_.end())
++                        {
++                            p_small_cls_sets_map_[cls] = dynamic_bitset<>(num_small_vertices_);
++                        }
++                        if(!p_small_cls_sets_map_[cls][pos])
++                        {
++                            p_small_cls_sets_map_[cls].set(pos);
++                            if(parents_[node] == graph_traits<GraphSmall>::null_vertex())
++                            {
++                                parents_[node] = node_order_[depth-1];
++                            }
++                        }
++                    }
++                    else {
++                        if(s_small_cls_sets_map_.find(cls) == s_small_cls_sets_map_.end())
++                        {
++                            s_small_cls_sets_map_[cls] = boost::dynamic_bitset<>(num_small_vertices_);
++                        }
++                        if(!s_small_cls_sets_map_[cls][pos])
++                        {
++                            s_small_cls_sets_map_[cls].set(pos);
++                            if(parents_[node] == graph_traits<GraphSmall>::null_vertex())
++                            {
++                                parents_[node] = node_order_[depth-1];
++                            }
++                        }
++                    }
++                    pos = p_s_union_set.find_next(pos);
++                }
++            }
++        }
++
++        void order_graph_small_vertices()
++        {
++            compute_vertex_probabilities();
++            std::unordered_map< SmallVertexType, double > dM_values;
++            std::unordered_map< SmallVertexType, uint64_t > nodes_total_degree;
++            std::pair<SmallVertexIterator, SmallVertexIterator> vp = vertices(graph_small_);
++            std::vector< SmallVertexType > remaining_nodes_candidates;
++            remaining_nodes_candidates.reserve(num_small_vertices_);
++
++            for (SmallVertexIterator it = vp.first; it != vp.second; ++it)
++            {
++                SmallVertexType v = *it;
++                dM_values[v] = 0.0;
++                nodes_total_degree[v] = in_degree(v, graph_small_) + out_degree(v, graph_small_);
++                remaining_nodes_candidates.push_back(v);
++            }
++
++            node_order_.reserve(num_small_vertices_);
++
++            while(node_order_.size() < num_small_vertices_)
++            {
++                SmallVertexType next_node;
++                if (node_order_.empty())
++                {
++                    // At the beginning, only the node_probabilities matter
++                    next_node = *std::min_element(
++                    remaining_nodes_candidates.begin(), remaining_nodes_candidates.end(),
++                        [&](SmallVertexType a, SmallVertexType b) {
++                            return node_probs_[a] < node_probs_[b];
++                        }
++                    );
++                }
++                else
++                {
++                    auto cmp = [&](SmallVertexType a, SmallVertexType b) {
++                        if(dM_values[a] != dM_values[b])
++                        {
++                            return dM_values[a] > dM_values[b];
++                        }
++                        if(node_probs_[a] != node_probs_[b])
++                        {
++                            return node_probs_[a] < node_probs_[b];
++                        }
++                        if(nodes_total_degree[a] != nodes_total_degree[b])
++                        {
++                            return nodes_total_degree[a] > nodes_total_degree[b];
++                        }
++                        return small_vertices_indices_[a] < small_vertices_indices_[b];
++                    };
++                    next_node = *std::min_element(remaining_nodes_candidates.begin(), remaining_nodes_candidates.end(), cmp);
++                }
++                node_order_.push_back(next_node);
++                remaining_nodes_candidates.erase(
++                    std::remove(remaining_nodes_candidates.begin(), remaining_nodes_candidates.end(), next_node),
++                    remaining_nodes_candidates.end()
++                );
++                dM_values.erase(next_node);
++                auto out_edges = boost::out_edges(next_node, graph_small_);
++                for(auto edge_it = out_edges.first; edge_it != out_edges.second; ++edge_it)
++                {
++                    SmallVertexType target = boost::target(*edge_it, graph_small_);
++                    if (dM_values.find(target) != dM_values.end())
++                    {
++                        dM_values[target] += 1;
++                    }
++                }
++                auto in_edges = boost::in_edges(next_node, graph_small_);
++                for(auto edge_it = in_edges.first; edge_it != in_edges.second; ++edge_it)
++                {
++                    SmallVertexType source = boost::source(*edge_it, graph_small_);
++                    if (dM_values.find(source) != dM_values.end())
++                    {
++                        dM_values[source] += 1;
++                    }
++                }
++            }
++        }
++
++        void compute_vertex_probabilities()
++        {
++            cumulative_degrees();
++            std::pair<SmallVertexIterator, SmallVertexIterator> vp = vertices(graph_small_);
++            for (SmallVertexIterator it = vp.first; it != vp.second; ++it)
++            {
++                SmallVertexType v = *it;
++                double label_probability = 1.0;
++                ClassType c = small_vertex_class_map_[v];
++                if (label_counts_.find(c) == label_counts_.end())
++                {
++                    label_probability = 0.0; // No such label in the large graph
++                    node_probs_[v] = 0.0;
++                    continue;
++                }
++                else
++                {
++                    uint64_t label_count = label_counts_[c];
++                    label_probability = static_cast<double>(label_count) / num_large_vertices_;
++                }
++                uint64_t in_degree_v = in_degree(v, graph_small_);
++                double in_degree_probability = 0.0;
++                if (in_degree_v < cumulative_in_degrees_.size())
++                {
++                    in_degree_probability = static_cast<double>(cumulative_in_degrees_[in_degree_v]) / num_large_vertices_;
++                }
++                else
++                {
++                    in_degree_probability = 0.0; // No such in-degree in the large graph
++                    node_probs_[v] = 0.0;
++                    continue;
++                }
++                uint64_t out_degree_v = out_degree(v, graph_small_);
++                double out_degree_probability = 0.0;
++                if (out_degree_v < cumulative_out_degrees_.size())
++                {
++                    out_degree_probability = static_cast<double>(cumulative_out_degrees_[out_degree_v]) / num_large_vertices_;
++                }
++                else
++                {
++                    out_degree_probability = 0.0; // No such out-degree in the large graph
++                    node_probs_[v] = 0.0;
++                    continue;
++                }
++                node_probs_[v] = label_probability * in_degree_probability * out_degree_probability;
++            }
++        }
++
++
++        void cumulative_degrees()
++        {
++            std::vector<uint64_t> in_degrees, out_degrees;
++            in_degrees.reserve(num_large_vertices_);
++            out_degrees.reserve(num_large_vertices_);
++
++            uint64_t max_in_degree = 0;
++            uint64_t max_out_degree = 0;
++
++            std::pair<LargeVertexIterator, LargeVertexIterator> vp = boost::vertices(graph_large_);
++            for (LargeVertexIterator it = vp.first; it != vp.second; ++it) {
++                LargeVertexType v = *it;
++                uint64_t in_deg = in_degree(v, graph_large_);
++                uint64_t out_deg = out_degree(v, graph_large_);
++                in_degrees.push_back(in_deg);
++                out_degrees.push_back(out_deg);
++                max_in_degree = std::max(max_in_degree, in_deg);
++                max_out_degree = std::max(max_out_degree, out_deg);
++            }
++
++            std::vector<uint64_t> in_hist(max_in_degree + 1, 0);
++            std::vector<uint64_t> out_hist(max_out_degree + 1, 0);
++
++            for (uint64_t d : in_degrees) {
++                in_hist[d]+=1;
++            }
++            for(uint64_t d: out_degrees)
++            {
++                out_hist[d]+=1;
++            }
++            cumulative_in_degrees_.resize(max_in_degree+1);
++            uint64_t running_sum = 0;
++            for (int64_t d = max_in_degree; d >= 0; --d) {
++                running_sum += in_hist[d];
++                cumulative_in_degrees_[d] = running_sum;
++            }
++            running_sum = 0;
++            cumulative_out_degrees_.resize(max_out_degree+1);
++            for(int64_t d = max_out_degree; d >= 0; --d)
++            {
++                running_sum += out_hist[d];
++                cumulative_out_degrees_[d] = running_sum;
++            }
++        }
++
++        // TODO: Make the following private
++
++        const GraphSmall& graph_small_;
++        const GraphLarge& graph_large_;
++        const SmallGraphVertexClassMap& small_vertex_class_map_;
++        const LargeGraphVertexClassMap& large_vertex_class_map_;
++        SubgraphIsoUserCallback callback_;
++        VertexEquivalencePredicate vertex_comp_pred_;
++        EdgeEquivalencePredicate edge_comp_pred_;
++
++        std::unordered_map<ClassType, uint64_t> class_index_map_;
++
++        std::vector<uint64_t> cumulative_in_degrees_;
++        std::vector<uint64_t> cumulative_out_degrees_;
++
++        bool found_match_;
++        bool stop_search_;
++
++        std::unordered_map< SmallVertexType, double > node_probs_;
++        std::unordered_map< ClassType, uint64_t> label_counts_;
++
++        std::unordered_set< SmallVertexType > graph_small_vertices_;
++        std::unordered_set< LargeVertexType > graph_large_vertices_;
++
++        std::unordered_map< SmallVertexType, LargeVertexType > core_small_;
++        std::unordered_map< LargeVertexType, SmallVertexType > core_large_;
++
++        std::unordered_map< SmallVertexType, uint64_t > small_vertices_indices_;
++        std::unordered_map< uint64_t, SmallVertexType > small_indices_vertices_;
++        std::unordered_map< LargeVertexType, uint64_t > large_vertices_indices_;
++        std::unordered_map< uint64_t, LargeVertexType > large_indices_vertices_;
++
++        std::vector<SmallVertexType> node_order_;
++
++        vf3_state< GraphSmall, GraphLarge, SmallGraphVertexClassMap, LargeGraphVertexClassMap, SubgraphIsoUserCallback, VertexEquivalencePredicate, EdgeEquivalencePredicate> state_;
++
++        std::unordered_map< ClassType, boost::dynamic_bitset<>> graph_large_class_nodes_;
++        std::unordered_map< ClassType, boost::dynamic_bitset<>> graph_small_class_nodes_;
++
++
++        std::vector<boost::dynamic_bitset<>> p_small_sets_;
++        std::vector<boost::dynamic_bitset<>> s_small_sets_;
++        std::vector<boost::dynamic_bitset<>> v_small_sets_;
++
++        std::unordered_map<SmallVertexType, SmallVertexType> parents_;
++        boost::dynamic_bitset<> large_predecessors_;
++        boost::dynamic_bitset<> large_successors_;
++        uint64_t num_small_vertices_;
++        uint64_t num_large_vertices_;
++
++    }; // Class matcher
++
++    template < typename Graph >
++    struct default_vertex_class_map {
++        using vertex_descriptor = typename graph_traits<Graph>::vertex_descriptor;
++        using value_type = int;
++        using reference = int;
++        using key_type = vertex_descriptor;
++        using category = boost::readable_property_map_tag;
++
++        int operator[](const vertex_descriptor&) const { return 0; }
++    }; // default_vertex_class_map
++
++    struct vertex_always_true {
++        template<typename V1, typename V2>
++        bool operator()(const V1&, const V2&) const noexcept {
++            return true;
++        }
++    }; // struct vertex_always_true
++
++    struct edge_always_true {
++        template< typename E1, typename E2>
++        bool operator()(const E1&, const E2&) const noexcept {
++            return true;
++        }
++    }; // struct edge_always_true
++
++
++} // namespace detail
++
++template < typename Graph >
++int get(const detail::default_vertex_class_map<Graph>& map,
++        const typename graph_traits<Graph>::vertex_descriptor& v)
++{
++    return map[v];
++}
++
++template< typename GraphSmall, typename GraphLarge, typename SubgraphIsoUserCallback >
++bool vf3_subgraph_iso(
++    const GraphSmall& graph_small,
++    const GraphLarge& graph_large,
++    SubgraphIsoUserCallback& callback
++)
++{
++    using SmallVertexType = typename graph_traits<GraphSmall>::vertex_descriptor;
++    using LargeVertexType = typename graph_traits<GraphLarge>::vertex_descriptor;
++
++    detail::default_vertex_class_map<GraphSmall> small_map;
++    detail::default_vertex_class_map<GraphLarge> large_map;
++    detail::vertex_always_true vertex_comp;
++    detail::edge_always_true edge_comp;
++
++    detail::matcher<GraphSmall, GraphLarge,
++        detail::default_vertex_class_map<GraphSmall>,
++        detail::default_vertex_class_map<GraphLarge>,
++        SubgraphIsoUserCallback,
++        detail::vertex_always_true,
++        detail::edge_always_true>
++    m(graph_small, graph_large, small_map, large_map, callback, vertex_comp, edge_comp);
++    return m.match();
++}
++
++template < typename GraphSmall, typename GraphLarge,
++            typename SmallGraphVertexClassMap,
++            typename LargeGraphVertexClassMap,
++            typename SubgraphIsoUserCallback >
++bool vf3_subgraph_iso(
++    const GraphSmall& graph_small,
++    const GraphLarge& graph_large,
++    const SmallGraphVertexClassMap& small_map,
++    const LargeGraphVertexClassMap& large_map,
++    SubgraphIsoUserCallback callback
++)
++{
++    detail::vertex_always_true vertex_comp;
++    detail::edge_always_true edge_comp;
++
++    detail::matcher<GraphSmall, GraphLarge,
++                    SmallGraphVertexClassMap,
++                    LargeGraphVertexClassMap,
++                    SubgraphIsoUserCallback,
++                    detail::vertex_always_true,
++                    detail::edge_always_true>
++        m(graph_small, graph_large, small_map, large_map, callback, vertex_comp, edge_comp);
++    return m.match();
++}
++
++template < typename GraphSmall, typename GraphLarge,
++           typename SmallGraphVertexClassMap,
++           typename LargeGraphVertexClassMap,
++           typename SubgraphIsoUserCallback,
++           typename VertexEquivalencePredicate>
++bool vf3_subgraph_iso(
++    const GraphSmall& graph_small,
++    const GraphLarge& graph_large,
++    const SmallGraphVertexClassMap& small_map,
++    const LargeGraphVertexClassMap& large_map,
++    SubgraphIsoUserCallback callback,
++    VertexEquivalencePredicate vertex_comp_pred)
++{
++
++    detail::edge_always_true edge_comp;
++
++    detail::matcher<GraphSmall, GraphLarge,
++                    SmallGraphVertexClassMap,
++                    LargeGraphVertexClassMap,
++                    SubgraphIsoUserCallback,
++                    VertexEquivalencePredicate,
++                    detail::edge_always_true>
++        m(graph_small, graph_large, small_map, large_map, callback, vertex_comp_pred, edge_comp);
++    return m.match();
++}
++
++template< typename GraphSmall, typename GraphLarge,
++          typename SubgraphIsoUserCallback,
++          typename VertexEquivalencePredicate>
++bool vf3_subgraph_iso(
++    const GraphSmall& graph_small,
++    const GraphLarge& graph_large,
++    SubgraphIsoUserCallback& callback,
++    VertexEquivalencePredicate vertex_comp_pred
++)
++{
++    detail::default_vertex_class_map<GraphSmall> small_map;
++    detail::default_vertex_class_map<GraphLarge> large_map;
++
++    detail::edge_always_true edge_comp;
++
++    detail::matcher<GraphSmall, GraphLarge,
++        detail::default_vertex_class_map<GraphSmall>,
++        detail::default_vertex_class_map<GraphLarge>,
++        SubgraphIsoUserCallback,
++        VertexEquivalencePredicate,
++        detail::edge_always_true>
++    m(graph_small, graph_large, small_map, large_map, callback, vertex_comp_pred, edge_comp);
++    return m.match();
++}
++
++template< typename GraphSmall, typename GraphLarge,
++          typename SubgraphIsoUserCallback,
++          typename VertexEquivalencePredicate,
++          typename EdgeEquivalencePredicate>
++bool vf3_subgraph_iso(
++    const GraphSmall& graph_small,
++    const GraphLarge& graph_large,
++    SubgraphIsoUserCallback& callback,
++    VertexEquivalencePredicate vertex_comp_pred,
++    EdgeEquivalencePredicate edge_comp_pred
++)
++{
++    detail::default_vertex_class_map<GraphSmall> small_map;
++    detail::default_vertex_class_map<GraphLarge> large_map;
++
++    detail::matcher<GraphSmall, GraphLarge,
++        detail::default_vertex_class_map<GraphSmall>,
++        detail::default_vertex_class_map<GraphLarge>,
++        SubgraphIsoUserCallback,
++        VertexEquivalencePredicate,
++        EdgeEquivalencePredicate>
++    m(graph_small, graph_large, small_map, large_map, callback, vertex_comp_pred, edge_comp_pred);
++    return m.match();
++}
++
++
++} // namespace boost
++
++#ifdef BOOST_ISO_INCLUDED_ITER_MACROS
++#undef BOOST_ISO_INCLUDED_ITER_MACROS
++#include <boost/graph/iteration_macros_undef.hpp>
++#endif
++
++#endif // BOOST_VF3_SUB_GRAPH_ISO_HPP
+\ No newline at end of file
