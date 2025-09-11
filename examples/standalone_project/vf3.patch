@@ -1,0 +1,27 @@
+diff --git a/include/ghl/graph/graph.h b/include/ghl/graph/graph.h
+index 7820b9d8..abf06bda 100644
+--- a/include/ghl/graph/graph.h
++++ b/include/ghl/graph/graph.h
+@@ -28,7 +28,7 @@
+ #include <boost/graph/graphviz.hpp>
+ #include <boost/graph/subgraph.hpp>
+ #include <boost/graph/vf2_sub_graph_iso.hpp>
+-#include <boost/graph/vf3_sub_graph_iso.hpp>
++// #include <boost/graph/vf3_sub_graph_iso.hpp>
+ #include <climits>
+ #include <filesystem>
+ #include <map>
+diff --git a/include/ghl/isomorphism/graph_isomorphisms.h b/include/ghl/isomorphism/graph_isomorphisms.h
+index ccf378c7..a92b96d2 100644
+--- a/include/ghl/isomorphism/graph_isomorphisms.h
++++ b/include/ghl/isomorphism/graph_isomorphisms.h
+@@ -261,8 +261,7 @@ public:
+     isomorphisms_callback callback(sg, g, isomorphisms, first, is_isomorphism_valid_, specialize_isomorphism_,
+                                    nonoverlapping);
+     if (use_vf3)
+-      boost::vf3_subgraph_iso(sg, g, callback, vertex_comp_helper(sg, g, vertex_comp_function()),
+-                              edge_comp_helper(sg, g, edge_comp_function()));
++      throw std::runtime_error("vf3 temporarily disabled");
+     else
+       boost::vf2_subgraph_iso(sg, g, callback, vertex_order_by_mult(sg),
+                               boost::edges_equivalent(edge_comp_helper(sg, g, edge_comp_function()))
