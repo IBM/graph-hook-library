@@ -8,6 +8,8 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
 jobs:
   lint:
     name: Black formatter
