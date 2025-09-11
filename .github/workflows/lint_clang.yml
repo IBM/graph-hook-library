@@ -1,5 +1,8 @@
 name: lint_clang
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
