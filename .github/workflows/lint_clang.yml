@@ -1,0 +1,18 @@
+name: lint_clang
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  clang-format-checking:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: RafikFarhad/clang-format-github-action@v3
+        with:
+          sources: "include/**/*.h,include/**/*.hpp,include/**/*.c,nclude/**/*.cpp"
