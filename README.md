@@ -106,4 +106,4 @@ pytest tests/python -s # If bindings are enabled.
 ## Contributing
 Before contributing, please lint code using the following commands (clang-format and black are required):
 1. `./run-clang-format.py -r include -i && ./run-clang-format.py -r tests/cpp -i`
-2. `black tests/python`
+2. `black . --check`

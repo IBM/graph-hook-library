@@ -9,10 +9,10 @@ on:
       - main
 
 jobs:
-  clang-format-checking:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: RafikFarhad/clang-format-github-action@v3
-        with:
-          sources: "include/**/*.h,include/**/*.hpp,include/**/*.c,nclude/**/*.cpp"
+      - run: |
+         pip install clang
+         ./run-clang-format.py -r include -i && ./run-clang-format.py -r tests/cpp -i
