@@ -21,7 +21,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ['c-cpp', 'python']
+        include:
+          - language: c-cpp
+            build-mode: autobuild
+          - lanauge: python
+            build-mode: none
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
