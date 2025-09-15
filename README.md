@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./logo.svg" width="25%">
+  <img src="https://raw.githubusercontent.com/IBM/graph-hook-library/refs/heads/main/logo.svg" width="25%">
 </p>
 
 <div align="center">
