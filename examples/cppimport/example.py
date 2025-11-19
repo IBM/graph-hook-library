@@ -1,4 +1,4 @@
 import cppimport.import_hook
-import ghl_ext
+import example_binding
 
-print(ghl_ext.get_magic_value())
+print(example_binding.empty_graph())

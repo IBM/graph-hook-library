@@ -16,3 +16,7 @@ cpm-package-lock.cmake
 .pytest_cache
 docs/_build
 .DS_Store
+.rendered.*
+*.lock
+example_binding.*
+__pycache__
