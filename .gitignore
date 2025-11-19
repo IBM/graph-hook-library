@@ -18,5 +18,5 @@ docs/_build
 .DS_Store
 .rendered.*
 *.lock
-example_binding.*
+example_binding.cpython*
 __pycache__
