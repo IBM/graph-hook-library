@@ -260,7 +260,6 @@ if(GHL_BINDINGS)
   install(TARGETS ghl_bindings DESTINATION "ghl_bindings")
 endif()
 
-
 if(GHL_MASTER_PROJECT)
   add_subdirectory(tests/cpp)
   add_subdirectory(examples)
@@ -282,10 +281,24 @@ if(GHL_MASTER_PROJECT)
       ${CMAKE_CURRENT_SOURCE_DIR}/tests
       ${CMAKE_CURRENT_BINARY_DIR}/tests
       COMMENT "Copying tests directory..."
-    )
+    )    
+    message(STATUS "Boost include dirs: ${boost_include_dirs}")
     if(DEFINED PY_BUILD_CMAKE_IMPORT_NAME)
+      get_target_property(BOOST_INCLUDE_DIRS boost_graph INTERFACE_INCLUDE_DIRECTORIES)
       install(TARGETS ghl_bindings
             DESTINATION "${PY_BUILD_CMAKE_IMPORT_NAME}")
+      install(DIRECTORY
+            "${CMAKE_CURRENT_SOURCE_DIR}/include/ghl"
+            DESTINATION "${PY_BUILD_CMAKE_IMPORT_NAME}/include")
+
+      foreach(boost_dir ${BOOST_INCLUDE_DIRS})
+          message(STATUS "Installing Boost headers from: ${boost_dir}")
+          install(
+              DIRECTORY "${boost_dir}"
+              DESTINATION "${PY_BUILD_CMAKE_IMPORT_NAME}"
+              FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+          )
+      endforeach()
     endif()
   endif()
 endif()
