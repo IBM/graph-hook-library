@@ -49,37 +49,49 @@ using VertexProperty = std::shared_ptr<ghl::BaseNode>;
 // Type alias for edge properties in the map graph
 using EdgeProperty = std::shared_ptr<ghl::PrimitiveEdge>;
 
-// Type alias for the specialized map graph implementation
-using MapGraphType = ghl::ExtendedGraph<VertexProperty, EdgeProperty>;
-
 /**
- * @brief Writes vertex properties to graph DOT file.
- *
- * This template specialization overrides the default BaseNode
- * vertex_property_writer to provide map-specific vertex visualization. It
- * formats each city's name and population for display in the GraphViz output.
- *
- * @param out Output stream for the DOT file
- * @param v Vertex descriptor whose properties should be written
+ * @class MapGraph
+ * @brief ExtendedGraph specialization with custom DOT writers.
  */
-template <> void MapGraphType::vertex_property_writer(std::ostream &out, const TemplatedVertex &v) const {
-  auto city = std::dynamic_pointer_cast<City>(graph()[v]);
-  out << std::format("[label=\"City: {}\nPopulation: {}\"]", city->name(), city->population());
-};
+class MapGraph : public ghl::DirectedExtendedGraph<VertexProperty, EdgeProperty> {
+  using Base = ghl::DirectedExtendedGraph<VertexProperty, EdgeProperty>;
 
-/**
- * @brief Writes edge properties to graph DOT file.
- *
- * This template specialization overrides the default PrimitiveEdge
- * edge_property_writer to provide map-specific edge visualization. It formats
- * each road's number of lanes for display in the GraphViz output.
- *
- * @param out Output stream for the DOT file
- * @param e Edge descriptor whose properties should be written
- */
-template <> void MapGraphType::edge_property_writer(std::ostream &out, const TemplatedEdge &e) const {
-  auto road = std::dynamic_pointer_cast<Road>(graph()[e]);
-  out << std::format("[label=\"num lanes: {}\"]", road->numLanes());
+public:
+  using Base::Base;
+
+  /**
+   * @brief Writes vertex properties to graph DOT file.
+   *
+   * This template specialization overrides the default BaseNode
+   * vertex_property_writer to provide map-specific vertex visualization. It
+   * formats each city's name and population for display in the GraphViz output.
+   *
+   * @param out Output stream for the DOT file
+   * @param v Vertex descriptor whose properties should be written
+   */
+  void vertex_property_writer(std::ostream &out, const VertexDescriptor &v) const override {
+    auto city = std::dynamic_pointer_cast<City>(this->graph()[v]);
+    if (city) {
+      out << std::format("[label=\"City: {}\nPopulation: {}\"]", city->name(), city->population());
+    } else {
+      out << std::format("[label=\"HUB \"]");
+    }
+  }
+
+  /**
+   * @brief Writes edge properties to graph DOT file.
+   *
+   * This template specialization overrides the default PrimitiveEdge
+   * edge_property_writer to provide map-specific edge visualization. It formats
+   * each road's number of lanes for display in the GraphViz output.
+   *
+   * @param out Output stream for the DOT file
+   * @param e Edge descriptor whose properties should be written
+   */
+  void edge_property_writer(std::ostream &out, const EdgeDescriptor &e) const override {
+    auto road = std::dynamic_pointer_cast<Road>(this->graph()[e]);
+    out << std::format("[label=\"num lanes: {}\"]", road->numLanes());
+  }
 };
 
 #endif

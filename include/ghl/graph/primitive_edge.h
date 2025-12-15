@@ -45,8 +45,9 @@
 #include "../cereal/forward_decl.h"
 #endif
 
-namespace ghl {
+namespace b = boost;
 
+namespace ghl {
 /**
  * @class PrimitiveEdge
  * @brief Base class for all edge property classes in the GHL.
@@ -64,8 +65,8 @@ namespace ghl {
  * maintain compatibility with Boost Graph Library's edge property system while
  * adding GHL-specific functionality.
  */
-class PrimitiveEdge : public boost::no_property {
-  int id_; //< Unique identifier for the edge
+class PrimitiveEdge : public b::no_property {
+  int id_; ///< Unique identifier for the edge
 #ifdef GHL_SERIALIZATION
   friend class cereal::access;
   template <class Archive> void serialize(Archive &ar);

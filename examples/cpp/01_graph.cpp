@@ -46,10 +46,10 @@
  * presence, and population. Roads between cities have a property indicating
  * number of lanes.
  *
- * @return MapGraphType A graph containing the cities and their connecting roads
+ * @return MapGraph A graph containing the cities and their connecting roads
  */
-MapGraphType make_map() {
-  auto map = MapGraphType();
+MapGraph make_map() {
+  auto map = MapGraph();
   // Add vertices (cities) with properties
   auto v1 = map.add_vertex(std::make_shared<City>("Chicago", 1000, true));
   auto v2 = map.add_vertex(std::make_shared<City>("New York", 10000, true));
@@ -78,10 +78,10 @@ MapGraphType make_map() {
  * @return int Exit status code
  */
 int main(int argc, char *argv[]) {
-  MapGraphType map = make_map();
+  MapGraph map = make_map();
   std::filesystem::create_directories("output");
   // Print information about each city (vertex)
-  for (MapGraphType::TemplatedVertex vertex : map.vertex_range()) {
+  for (MapGraph::VertexDescriptor vertex : map.vertex_range()) {
     auto city = std::dynamic_pointer_cast<City>(map[vertex]);
     std::cout << std::format("{} has a population of {} and has a post office: {}", city->name(), city->population(),
                              city->hasPostOffice())
@@ -89,7 +89,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Print information about each road (edge)
-  for (MapGraphType::TemplatedEdge edge : map.edge_range()) {
+  for (MapGraph::EdgeDescriptor edge : map.edge_range()) {
     auto road = std::dynamic_pointer_cast<Road>(map[edge]);
     auto src_city = std::dynamic_pointer_cast<City>(map[map.edge_source(edge)]);
     auto trg_city = std::dynamic_pointer_cast<City>(map[map.edge_target(edge)]);

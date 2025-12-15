@@ -62,20 +62,24 @@ namespace ghl {
  * - Generating visual representations through GraphViz
  *
  * @tparam VertexProperties The type of properties stored in vertices.
+ * @tparam DirectionProperty The directionality tag for the underlying graph.
  * @tparam EdgeProperties The type of properties stored in edges (defaults to
  * boost::no_property).
  */
-template <typename VertexProperties, typename EdgeProperties = b::no_property> class ExtendedSubGraph {
+template <typename VertexProperties, typename DirectionProperty, typename EdgeProperties = b::no_property>
+class ExtendedSubGraph {
   /** @brief Type alias for GraphViz attribute maps */
-  using GraphvizAttributes = std::map<std::string, std::string, std::less<>>;
+  using GraphvizAttributes = std::map<std::string, std::string, std::less<>>; ///< GraphViz attribute map type.
 
   /** @brief Type for vertex properties extended with GraphViz attributes */
-  using ExtendedVertexProperties = b::property<b::vertex_attribute_t, GraphvizAttributes, VertexProperties>;
+  using ExtendedVertexProperties =
+      b::property<b::vertex_attribute_t, GraphvizAttributes, VertexProperties>; ///< Vertex property with attributes.
 
   /** @brief Type for edge properties extended with GraphViz attributes and
    * indices */
-  using ExtendedEdgeProperties =
-      b::property<b::edge_index_t, int, b::property<b::edge_attribute_t, GraphvizAttributes, EdgeProperties>>;
+  using ExtendedEdgeProperties = b::property<b::edge_index_t, int,
+                                             b::property<b::edge_attribute_t, GraphvizAttributes,
+                                                         EdgeProperties>>; ///< Edge property with attributes/index.
 
   /**
    * @brief Type definition for the underlying graph structure.
@@ -84,27 +88,22 @@ template <typename VertexProperties, typename EdgeProperties = b::no_property> c
    * graph-level attributes for GraphViz visualization.
    */
   using UnderlyingGraph = b::adjacency_list<
-      b::vecS, b::vecS, b::bidirectionalS, ExtendedVertexProperties, ExtendedEdgeProperties,
+      b::vecS, b::vecS, DirectionProperty, ExtendedVertexProperties, ExtendedEdgeProperties,
       b::property<b::graph_name_t, std::string,
                   b::property<b::graph_graph_attribute_t, GraphvizAttributes,
                               b::property<b::graph_vertex_attribute_t, GraphvizAttributes,
                                           b::property<b::graph_edge_attribute_t, GraphvizAttributes>>>>>;
 
   /** @brief The underlying Boost subgraph instance */
-  b::subgraph<UnderlyingGraph> graph_;
+  b::subgraph<UnderlyingGraph> graph_; ///< Underlying graph storage with subgraph support.
 
   /** @brief Maps subgraphs to their names */
-  std::map<std::string, b::subgraph<UnderlyingGraph> *> subgraphs_;
+  std::map<std::string, b::subgraph<UnderlyingGraph> *> subgraphs_; ///< Named subgraphs keyed by identifier.
 
 public:
-  /** @brief Type alias for the graph implementation */
-  using GraphType = b::subgraph<UnderlyingGraph>;
-
-  /** @brief Type alias for vertex descriptors */
-  using Vertex = b::graph_traits<GraphType>::vertex_descriptor;
-
-  /** @brief Type alias for edge descriptors */
-  using Edge = b::graph_traits<GraphType>::edge_descriptor;
+  using GraphType = b::subgraph<UnderlyingGraph>;                         ///< Exposed subgraph type.
+  using VertexDescriptor = b::graph_traits<GraphType>::vertex_descriptor; ///< Vertex descriptor type.
+  using EdgeDescriptor = b::graph_traits<GraphType>::edge_descriptor;     ///< Edge descriptor type.
 
   /**
    * @brief Accesses the underlying graph instance.
@@ -129,13 +128,13 @@ public:
    * @param subgraph The subgraph to add the vertex to
    * @return A pair containing the global and local vertex descriptors
    */
-  std::pair<Vertex, Vertex> add_vertex(VertexProperties v, GraphType &subgraph) {
+  std::pair<VertexDescriptor, VertexDescriptor> add_vertex(VertexProperties v, GraphType &subgraph) {
     if constexpr (is_shared_ptr<VertexProperties>::value == true) {
       if (v == nullptr)
         v = std::make_shared<typename VertexProperties::element_type>();
     }
     // Create vertex in global graph
-    Vertex v_global = b::add_vertex(graph_);
+    VertexDescriptor v_global = b::add_vertex(graph_);
     graph_[v_global] = v;
     // Update graph attributes. Call changes depending on if VertexProperties
     // is a shared_ptr or a base class
@@ -145,7 +144,7 @@ public:
       b::put(b::get(b::vertex_attribute, graph_), v_global, v.graphAttributes());
 
     // Create corresponding vertex in subgraph if different from global
-    Vertex v_local = (&subgraph != &graph_) ? b::add_vertex(v_global, subgraph) : v_global;
+    VertexDescriptor v_local = (&subgraph != &graph_) ? b::add_vertex(v_global, subgraph) : v_global;
     return std::make_pair(v_global, v_local);
   }
 
@@ -156,7 +155,7 @@ public:
    * provided)
    * @return The descriptor of the newly created vertex
    */
-  Vertex add_vertex(VertexProperties v = VertexProperties()) { return this->add_vertex(v, graph_).first; }
+  VertexDescriptor add_vertex(VertexProperties v = VertexProperties()) { return this->add_vertex(v, graph_).first; }
 
   /**
    * @brief Creates a vertex with default properties in both contexts.
@@ -167,7 +166,9 @@ public:
    * @param subgraph The subgraph to add the vertex to
    * @return A pair containing the global and local vertex descriptors
    */
-  std::pair<Vertex, Vertex> add_vertex(GraphType &subgraph) { return this->add_vertex(VertexProperties(), subgraph); }
+  std::pair<VertexDescriptor, VertexDescriptor> add_vertex(GraphType &subgraph) {
+    return this->add_vertex(VertexProperties(), subgraph);
+  }
 
   /**
    * @brief Creates an edge with properties in a specific graph context.
@@ -183,7 +184,8 @@ public:
    * @return A pair containing the edge descriptor and a boolean indicating
    * success
    */
-  std::pair<Edge, bool> add_edge(Vertex source, Vertex target, EdgeProperties e, GraphType &subgraph) {
+  std::pair<EdgeDescriptor, bool> add_edge(VertexDescriptor source, VertexDescriptor target, EdgeProperties e,
+                                           GraphType &subgraph) {
     if constexpr (is_shared_ptr<EdgeProperties>::value == true) {
       if (e == nullptr)
         e = std::make_shared<typename EdgeProperties::element_type>();
@@ -213,7 +215,8 @@ public:
    * @return A pair containing the edge descriptor and a boolean indicating
    * success
    */
-  std::pair<Edge, bool> add_edge(Vertex source, Vertex target, EdgeProperties e = EdgeProperties()) {
+  std::pair<EdgeDescriptor, bool> add_edge(VertexDescriptor source, VertexDescriptor target,
+                                           EdgeProperties e = EdgeProperties()) {
     return this->add_edge(source, target, e, graph_);
   }
 
@@ -229,7 +232,7 @@ public:
    * @return A pair containing the edge descriptor and a boolean indicating
    * success
    */
-  std::pair<Edge, bool> add_edge(Vertex source, Vertex target, GraphType &subgraph) {
+  std::pair<EdgeDescriptor, bool> add_edge(VertexDescriptor source, VertexDescriptor target, GraphType &subgraph) {
     return this->add_edge(source, target, EdgeProperties(), subgraph);
   }
 
@@ -282,10 +285,10 @@ public:
    * properties that affect visualization.
    */
   void update_graph_attributes() {
-    for (Vertex v : b::make_iterator_range(b::vertices(graph_))) {
+    for (VertexDescriptor v : b::make_iterator_range(b::vertices(graph_))) {
       b::put(b::get(b::vertex_attribute, graph_), v, graph_[v]->graphAttributes());
     }
-    for (Edge e : b::make_iterator_range(b::edges(graph_))) {
+    for (EdgeDescriptor e : b::make_iterator_range(b::edges(graph_))) {
       b::put(b::get(b::edge_attribute, graph_), e, graph_[e]->graphAttributes());
     }
   }
@@ -300,7 +303,7 @@ public:
    * @pre The graph must not be empty and vertices must have an 'id' member.
    */
   void fix_id_vertices() {
-    for (Vertex v : b::make_iterator_range(b::vertices(graph_))) {
+    for (VertexDescriptor v : b::make_iterator_range(b::vertices(graph_))) {
       graph_[v]->id(v);
     }
     update_graph_attributes();
@@ -324,6 +327,12 @@ public:
     ghl::convert_dot_to_pdf(filename_dot, filename + ".pdf");
   }
 };
+
+template <typename VertexProperties, typename EdgeProperties = b::no_property>
+using DirectedExtendedSubGraph = ExtendedSubGraph<VertexProperties, b::bidirectionalS, EdgeProperties>;
+
+template <typename VertexProperties, typename EdgeProperties = b::no_property>
+using UndirectedExtendedSubGraph = ExtendedSubGraph<VertexProperties, b::undirectedS, EdgeProperties>;
 
 } // namespace ghl
 

@@ -61,13 +61,15 @@ namespace cereal {
  *
  * @tparam Archive The type of archive to serialize to
  * @tparam VertexProperties The type of vertex properties in the graph
+ * @tparam DirectionProperty The directionality property (e.g., bidirectionalS or undirectedS)
  * @tparam EdgeProperties The type of edge properties in the graph
  *
  * @param ar The archive to save to
  * @param graph The graph to serialize
  */
-template <class Archive, typename VertexProperties, typename EdgeProperties = b::no_property>
-void save(Archive &ar, ghl::Graph<VertexProperties, EdgeProperties> const &graph) {
+template <class Archive, typename VertexProperties, typename DirectionProperty,
+          typename EdgeProperties = b::no_property>
+void save(Archive &ar, ghl::Graph<VertexProperties, DirectionProperty, EdgeProperties> const &graph) {
   using serializable_edge = std::tuple<unsigned long int, unsigned long int, EdgeProperties>;
 
   auto n_vertices = num_vertices(graph); //< Get total vertex count
@@ -100,13 +102,15 @@ void save(Archive &ar, ghl::Graph<VertexProperties, EdgeProperties> const &graph
  *
  * @tparam Archive The type of archive to deserialize from
  * @tparam VertexProperties The type of vertex properties in the graph
+ * @tparam DirectionProperty The directionality property (e.g., bidirectionalS or undirectedS)
  * @tparam EdgeProperties The type of edge properties in the graph
  *
  * @param ar The archive to load from
  * @param graph The graph to deserialize into
  */
-template <class Archive, typename VertexProperties, typename EdgeProperties = b::no_property>
-void load(Archive &ar, ghl::Graph<VertexProperties, EdgeProperties> &graph) {
+template <class Archive, typename VertexProperties, typename DirectionProperty,
+          typename EdgeProperties = b::no_property>
+void load(Archive &ar, ghl::Graph<VertexProperties, DirectionProperty, EdgeProperties> &graph) {
   using serializable_edge = std::tuple<unsigned long int, unsigned long int, EdgeProperties>;
 
   int n_vertices; //< Number of vertices to restore

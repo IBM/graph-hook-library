@@ -27,8 +27,5 @@
 #ifdef GHL_SERIALIZATION
 #include "serialization/graph_serialization.h"
 #endif
-#ifdef GHL_BINDINGS
-#include "bindings/graph_bindings.h"
-#endif
 
 #endif

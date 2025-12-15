@@ -29,11 +29,11 @@ Tests bindings functionality including:
 """
 
 try:
-    from graph_hook_library.ghl_bindings import Graph, BaseNode, PrimitiveEdge
+    from graph_hook_library.ghl_bindings import DirectedGraph, BaseNode, PrimitiveEdge
     import graph_hook_library.ghl_bindings as ghl
 except ModuleNotFoundError:
     import ghl_bindings as ghl
-    from ghl_bindings import Graph, BaseNode, PrimitiveEdge
+    from ghl_bindings import DirectedGraph, BaseNode, PrimitiveEdge
 
 
 def create_test_graph():
@@ -48,7 +48,7 @@ def create_test_graph():
         Graph: The constructed test graph
     """
     # Initialize empty graph
-    graph = Graph()
+    graph = DirectedGraph()
 
     # Create and add vertices with sequential IDs
     v1 = BaseNode(0)
@@ -73,7 +73,7 @@ def test_vertex_operations():
         - Python-side modifications persist
     """
     # Create graph for vertex testing
-    graph = Graph()
+    graph = DirectedGraph()
 
     # Add vertex with known ID
     vertex = BaseNode(42)
@@ -105,3 +105,8 @@ def test_edge_operations():
     edge = edges[0]
     assert ghl.source(edge, graph) == 0
     assert ghl.target(edge, graph) == 1
+
+
+if __name__ == "__main__":
+    test_vertex_operations()
+    test_edge_operations()

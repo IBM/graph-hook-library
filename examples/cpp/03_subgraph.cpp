@@ -38,7 +38,7 @@
 #include "map_graph.h"
 #include <ghl/ghl_subgraphs.h>
 
-using MapSubGraphType = ghl::ExtendedSubGraph<VertexProperty, EdgeProperty>;
+using MapSubGraphType = ghl::DirectedExtendedSubGraph<VertexProperty, EdgeProperty>;
 
 /**
  * @brief Creates a hierarchical world map using subgraphs.

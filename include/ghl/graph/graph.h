@@ -54,6 +54,7 @@
 #include <map>
 #include <ranges>
 #include <set>
+#include <type_traits>
 #include <typeinfo>
 #include <unordered_set>
 
@@ -85,9 +86,9 @@ template <typename T> using CloneVertexFunction = std::function<T(T)>;
  * @tparam U The type of the edge properties (default: `boost::no_property`).
  */
 template <typename T, typename U = b::no_property> struct generic_edge_descriptor {
-  T in_;         //< Source vertex identifier.
-  T out_;        //< Target vertex identifier.
-  U properties_; //< Properties associated with the edge.
+  T in_;         ///< Source vertex identifier.
+  T out_;        ///< Target vertex identifier.
+  U properties_; ///< Properties associated with the edge.
 };
 
 /**
@@ -110,124 +111,71 @@ struct pair_hash {
   }
 };
 
-// Define graph types.
 /**
  * @typedef Graph
- * @brief A bidirectional graph structure with customizable properties.
+ * @brief An adjacency-list graph structure with customizable properties.
  *
  * @tparam VertexProperties Properties associated with vertices.
  * This is commonly a class that will be instantiated at each vertex.
+ * @tparam DirectionProperty Boost direction selector (e.g., bidirectionalS,
+ * undirectedS).
  * @tparam EdgeProperties Properties associated with edges (default:
  * `boost::no_property`). This is commonly a class that will be
  * instantiated at each edge.
  * @tparam GraphProperties Properties associated with the entire graph (default:
  * `boost::no_property`).
  */
+template <typename VertexProperties, typename DirectionProperty, typename EdgeProperties = b::no_property,
+          typename GraphProperties = b::no_property>
+using Graph = b::adjacency_list<b::vecS, b::vecS, DirectionProperty, VertexProperties, EdgeProperties, GraphProperties>;
+
+/// Graph specialization for directed graphs.
 template <typename VertexProperties, typename EdgeProperties = b::no_property,
           typename GraphProperties = b::no_property>
-using Graph = b::adjacency_list<b::vecS, b::vecS, b::bidirectionalS, VertexProperties, EdgeProperties, GraphProperties>;
+using DirectedGraph = Graph<VertexProperties, b::bidirectionalS, EdgeProperties, GraphProperties>;
 
-/**
- * @typedef UndirectedGraph
- * @brief An undirected graph structure with customizable properties.
- *
- * @tparam VertexProperties Properties associated with vertices.
- * This is commonly a class that will be instantiated at each vertex.
- * @tparam EdgeProperties Properties associated with edges (default:
- * `boost::no_property`). This is commonly a class that will be
- * instantiated at each edge.
- * @tparam GraphProperties Properties associated with the entire graph (default:
- * `boost::no_property`).
- */
+/// Graph specialization for unddirected graphs.
 template <typename VertexProperties, typename EdgeProperties = b::no_property,
           typename GraphProperties = b::no_property>
-using UndirectedGraph =
-    b::adjacency_list<b::vecS, b::vecS, b::undirectedS, VertexProperties, EdgeProperties, GraphProperties>;
-
-// Define vertex types.
-/**
- * @typedef Vertex
- * @brief Descriptor type for vertices in a bidirectional graph.
- *
- * @tparam VertexProperties Properties associated with vertices.
- * This is commonly a class that will be instantiated at each vertex.
- * @tparam EdgeProperties Properties associated with edges (default:
- * `boost::no_property`). This is commonly a class that will be
- * instantiated at each edge.
- */
-template <typename VertexProperties, typename EdgeProperties = b::no_property>
-using Vertex = typename b::graph_traits<Graph<VertexProperties, EdgeProperties>>::vertex_descriptor;
-
-/**
- * @typedef UVertex
- * @brief Descriptor type for vertices in an undirected graph.
- *
- * @tparam VertexProperties Properties associated with vertices.
- * This is commonly a class that will be instantiated at each vertex.
- * @tparam EdgeProperties Properties associated with edges (default:
- * `boost::no_property`). This is commonly a class that will be
- * instantiated at each edge.
- */
-template <typename VertexProperties, typename EdgeProperties = b::no_property>
-using UVertex = typename b::graph_traits<UndirectedGraph<VertexProperties, EdgeProperties>>::vertex_descriptor;
-
-// Define edge types.
-/**
- * @typedef Edge
- * @brief Descriptor type for edges in a bidirectional graph.
- *
- * @tparam VertexProperties Properties associated with vertices.
- * This is commonly a class that will be instantiated at each vertex.
- * @tparam EdgeProperties Properties associated with edges (default:
- * `boost::no_property`). This is commonly a class that will be
- * instantiated at each edge.
- */
-template <typename VertexProperties, typename EdgeProperties = b::no_property>
-using Edge = typename b::graph_traits<Graph<VertexProperties, EdgeProperties>>::edge_descriptor;
-
-/**
- * @typedef UEdge
- * @brief Descriptor type for edges in an undirected graph.
- *
- * @tparam VertexProperties Properties associated with vertices.
- * This is commonly a class that will be instantiated at each vertex.
- * @tparam EdgeProperties Properties associated with edges (default:
- * `boost::no_property`). This is commonly a class that will be
- * instantiated at each edge.
- */
-template <typename VertexProperties, typename EdgeProperties = b::no_property>
-using UEdge = typename b::graph_traits<UndirectedGraph<VertexProperties, EdgeProperties>>::edge_descriptor;
+using UndirectedGraph = Graph<VertexProperties, b::undirectedS, EdgeProperties, GraphProperties>;
 
 /**
  * @struct EdgeReplacementStruct
  * @brief Represents the replacement of an edge in a graph.
  *
  * @tparam VertexProperties Properties associated with vertices.
+ * @tparam DirectionProperty Boost direction selector for the graph.
  * @tparam EdgeProperties Properties associated with edges (default:
  * `boost::no_property`).
  */
-template <typename VertexProperties, typename EdgeProperties = b::no_property> struct EdgeReplacementStruct {
-  Vertex<VertexProperties, EdgeProperties> src_trg;    //< The source or target vertex of the edge.
-  Vertex<VertexProperties, EdgeProperties> old_vertex; //< The old vertex to be replaced.
-  Vertex<VertexProperties, EdgeProperties> new_vertex; //< The new vertex replacing the old one.
-  EdgeProperties edge_properties;                      //< Properties of the edge being replaced.
+template <typename VertexProperties, typename DirectionProperty, typename EdgeProperties = b::no_property>
+struct EdgeReplacementStruct {
+  using VertexDescriptor =
+      Graph<VertexProperties, DirectionProperty, EdgeProperties>::vertex_descriptor; ///< Vertex descriptor type.
+  VertexDescriptor src_trg;       ///< The source or target vertex of the edge.
+  VertexDescriptor old_vertex;    ///< The old vertex to be replaced.
+  VertexDescriptor new_vertex;    ///< The new vertex replacing the old one.
+  EdgeProperties edge_properties; ///< Properties of the edge being replaced.
 };
 
 /**
  * @brief Constructs a graph from a set of vertices and edges.
  *
  * @tparam T The type of vertex properties.
+ * @tparam D Boost direction selector for the graph.
  * @tparam E The type of edge properties (default: `boost::no_property`).
  * @param vertex_vector A vector of vertices to be added to the graph.
  * @param vertex_eds A vector of edge descriptors defining the edges between
  * vertices.
  * @return A constructed graph of type `Graph<T, E>`.
  */
-template <typename T, typename E = b::no_property>
-Graph<T, E> construct_graph(std::vector<T> vertex_vector, std::vector<generic_edge_descriptor<int, E>> vertex_eds) {
-  Graph<T, E> g;
+template <typename T, typename D, typename E = b::no_property>
+Graph<T, D, E> construct_graph(std::vector<T> vertex_vector, std::vector<generic_edge_descriptor<int, E>> vertex_eds) {
+  using GraphType = Graph<T, D, E>;
+  using VertexDescriptor = typename GraphType::vertex_descriptor;
+  GraphType g;
   std::vector<T> sorted_vertices;
-  std::vector<Vertex<T, E>> vertices_;
+  std::vector<VertexDescriptor> vertices_;
   int64_t n_vertices = vertex_vector.size();
   int64_t n_edges = vertex_eds.size();
   sorted_vertices.resize(n_vertices);
@@ -248,20 +196,24 @@ Graph<T, E> construct_graph(std::vector<T> vertex_vector, std::vector<generic_ed
  * @brief Deconstructs a graph into its vertices and edge descriptors.
  *
  * @tparam T The type of vertex properties.
+ * @tparam D Boost direction selector for the graph.
  * @tparam E The type of edge properties (default: `boost::no_property`).
  * @param g The graph to be deconstructed.
  * @return A pair containing a vector of vertices and a vector of edge
  * descriptors.
  */
-template <typename T, typename E = b::no_property>
-std::pair<std::vector<T>, std::vector<generic_edge_descriptor<int, E>>> deconstruct_graph(Graph<T, E> g) {
+template <typename T, typename D, typename E = b::no_property>
+std::pair<std::vector<T>, std::vector<generic_edge_descriptor<int, E>>> deconstruct_graph(Graph<T, D, E> g) {
+  using GraphType = Graph<T, D, E>;
+  using VertexDescriptor = typename GraphType::vertex_descriptor;
+  using EdgeDescriptor = typename GraphType::edge_descriptor;
   std::vector<T> vertex_vector;
   vertex_vector.resize(b::num_vertices(g));
   std::vector<generic_edge_descriptor<int, E>> vertex_eds;
-  for (Vertex<T, E> vertex : b::make_iterator_range(b::vertices(g))) {
+  for (VertexDescriptor vertex : b::make_iterator_range(b::vertices(g))) {
     vertex_vector.at(g[vertex]->id()) = g[vertex];
   }
-  for (Edge<T, E> edge : b::make_iterator_range(b::edges(g))) {
+  for (EdgeDescriptor edge : b::make_iterator_range(b::edges(g))) {
     vertex_eds.push_back(generic_edge_descriptor<int, E>(g[source(edge, g)]->id(), g[target(edge, g)]->id(), g[edge]));
   }
   return std::make_pair(vertex_vector, vertex_eds);
@@ -322,25 +274,25 @@ template <typename V, typename G> void update_edge_target(V source, V target, V 
  * @brief A wrapper class around a Boost graph providing extended functionality.
  *
  * @tparam VertexProperties Properties associated with vertices.
+ * @tparam DirectionProperty Boost direction selector for the underlying graph.
  * @tparam EdgeProperties Properties associated with edges (default:
  * `boost::no_property`).
  */
-template <typename VertexProperties, typename EdgeProperties = b::no_property> class ExtendedGraph {
+template <typename VertexProperties_, typename DirectionProperty_, typename EdgeProperties_ = b::no_property>
+class ExtendedGraph {
 protected:
-  Graph<VertexProperties, EdgeProperties> graph_{}; //< Internal Boost graph instance.
+  Graph<VertexProperties_, DirectionProperty_, EdgeProperties_> graph_{}; ///< Internal Boost graph instance.
 
 public:
-  using GraphType = Graph<VertexProperties, EdgeProperties>; //< Alias for the graph type.
-  using TemplatedVertex = Vertex<VertexProperties,
-                                 EdgeProperties>; //< Alias for vertex descriptor type.
-  using TemplatedEdge = Edge<VertexProperties,
-                             EdgeProperties>; //< Alias for edge descriptor type.
-  using IsoMap = std::map<TemplatedVertex,
-                          std::vector<TemplatedVertex>>; //< Alias for isomorphism map
-                                                         //< type.
-  using TemplatedEdgeReplacementStruct = EdgeReplacementStruct<VertexProperties,
-                                                               EdgeProperties>; //< Alias for edge replacement
-                                                                                //< structure.
+  using GraphType = Graph<VertexProperties_, DirectionProperty_, EdgeProperties_>; ///< Alias for the graph type.
+  using VertexDescriptor = GraphType::vertex_descriptor;                           ///< Descriptor for vertices.
+  using EdgeDescriptor = GraphType::edge_descriptor;                               ///< Descriptor for edges.
+  using VertexProperties = VertexProperties_;                                      ///< Vertex property type.
+  using DirectionProperty = DirectionProperty_;                                    ///< Graph direction selector type.
+  using EdgeProperties = EdgeProperties_;                                          ///< Edge property type.
+  using IsoMap = std::map<VertexDescriptor, std::vector<VertexDescriptor>>; ///< Mapping of pattern to target vertices.
+  using GraphEdgeReplacementStruct = EdgeReplacementStruct<VertexProperties, DirectionProperty,
+                                                           EdgeProperties>; ///< Alias for edge replacement structure.
 
   /**
    * @brief Default constructor.
@@ -381,7 +333,7 @@ public:
    * provided).
    * @return The descriptor of the newly added vertex.
    */
-  TemplatedVertex add_vertex(VertexProperties v = VertexProperties()) { return b::add_vertex(v, graph_); }
+  VertexDescriptor add_vertex(VertexProperties v = VertexProperties()) { return b::add_vertex(v, graph_); }
 
   /**
    * @brief Adds an edge between two vertices in the graph.
@@ -392,7 +344,7 @@ public:
    * provided).
    * @return The descriptor of the newly added edge.
    */
-  TemplatedEdge add_edge(TemplatedVertex src, TemplatedVertex trg, EdgeProperties e = EdgeProperties()) {
+  EdgeDescriptor add_edge(VertexDescriptor src, VertexDescriptor trg, EdgeProperties e = EdgeProperties()) {
     auto [edge, added] = b::add_edge(src, trg, e, graph_);
     return edge;
   }
@@ -403,7 +355,7 @@ public:
    * @param e The edge descriptor.
    * @return The descriptor of the source vertex.
    */
-  TemplatedVertex edge_source(TemplatedEdge e) const { return b::source(e, graph_); }
+  VertexDescriptor edge_source(EdgeDescriptor e) const { return b::source(e, graph_); }
 
   /**
    * @brief Retrieves the target vertex of a given edge.
@@ -411,7 +363,7 @@ public:
    * @param e The edge descriptor.
    * @return The descriptor of the target vertex.
    */
-  TemplatedVertex edge_target(TemplatedEdge e) const { return b::target(e, graph_); }
+  VertexDescriptor edge_target(EdgeDescriptor e) const { return b::target(e, graph_); }
 
   /**
    * @brief Provides a range of all vertices in the graph.
@@ -437,7 +389,7 @@ public:
    * @param v The vertex descriptor.
    * @return A reference to the properties of the specified vertex.
    */
-  VertexProperties &operator[](const TemplatedVertex &v) { return graph_[v]; }
+  VertexProperties &operator[](const VertexDescriptor &v) { return graph_[v]; }
 
   /**
    * @brief Accesses the properties of a vertex (const).
@@ -445,7 +397,7 @@ public:
    * @param v The vertex descriptor.
    * @return A reference to the properties of the specified vertex.
    */
-  const VertexProperties &operator[](const TemplatedVertex &v) const { return graph_[v]; }
+  const VertexProperties &operator[](const VertexDescriptor &v) const { return graph_[v]; }
 
   /**
    * @brief Accesses the properties of an edge.
@@ -453,7 +405,7 @@ public:
    * @param e The edge descriptor.
    * @return A reference to the properties of the specified edge.
    */
-  EdgeProperties &operator[](const TemplatedEdge &e) { return graph_[e]; }
+  EdgeProperties &operator[](const EdgeDescriptor &e) { return graph_[e]; }
 
   /**
    * @brief Accesses the properties of an edge (const).
@@ -461,7 +413,7 @@ public:
    * @param e The edge descriptor.
    * @return A reference to the properties of the specified edge.
    */
-  const EdgeProperties &operator[](const TemplatedEdge &e) const { return graph_[e]; }
+  const EdgeProperties &operator[](const EdgeDescriptor &e) const { return graph_[e]; }
 
   /**
    * @brief Checks if a vertex exists in the isomorphism map.
@@ -470,9 +422,9 @@ public:
    * @param isomorphism The isomorphism map containing vertices.
    * @return True if the vertex exists in the isomorphism map, false otherwise.
    */
-  bool is_vertex_in_isomorphism(const TemplatedVertex &vertex, const IsoMap &isomorphism) const {
+  bool is_vertex_in_isomorphism(const VertexDescriptor &vertex, const IsoMap &isomorphism) const {
     return std::ranges::any_of(isomorphism,
-                               [&vertex](const std::pair<TemplatedVertex, std::vector<TemplatedVertex>> &iso) {
+                               [&vertex](const std::pair<VertexDescriptor, std::vector<VertexDescriptor>> &iso) {
                                  return std::ranges::find(iso.second, vertex) != iso.second.end();
                                });
   }
@@ -490,7 +442,7 @@ public:
        * @param s The vertex being initialized.
        * @param g The graph being traversed.
        */
-      void initialize_vertex(TemplatedVertex s, GraphType const &g) const {
+      void initialize_vertex(VertexDescriptor s, GraphType const &g) const {
         std::cout << "Initialize: " << g[s]->id() << std::endl;
       }
 
@@ -499,7 +451,7 @@ public:
        * @param s The vertex being started.
        * @param g The graph being traversed.
        */
-      void start_vertex(TemplatedVertex s, GraphType const &g) const {
+      void start_vertex(VertexDescriptor s, GraphType const &g) const {
         std::cout << "Start:      " << g[s]->id() << std::endl;
       }
 
@@ -508,7 +460,7 @@ public:
        * @param s The vertex being discovered.
        * @param g The graph being traversed.
        */
-      void discover_vertex(TemplatedVertex s, GraphType const &g) const {
+      void discover_vertex(VertexDescriptor s, GraphType const &g) const {
         std::cout << "Discover:   " << g[s]->id() << std::endl;
       }
 
@@ -517,7 +469,7 @@ public:
        * @param s The vertex being finished.
        * @param g The graph being traversed.
        */
-      void finish_vertex(TemplatedVertex s, GraphType const &g) const {
+      void finish_vertex(VertexDescriptor s, GraphType const &g) const {
         std::cout << "Finished:   " << g[s]->id() << std::endl;
       }
     };
@@ -535,18 +487,17 @@ public:
    * @param filename The base filename (without extension) for the output files.
    * @param render_pdf If true, renders the DOT file to a PDF.
    */
-  int curr_graph = 0;
-
   void write_graph(const std::string &filename, bool render_pdf = true) {
     std::filesystem::path p(filename);
     std::string base_path = p.parent_path().string();
     std::string file_name = p.filename().string();
-    std::string indexed_filename = std::format("{}/{}_{}", base_path, curr_graph++, file_name);
+    std::string indexed_filename = std::format("{}/{}", base_path, file_name);
 
     std::ofstream dotFile(indexed_filename + ".dot");
     auto vertexWriter = [this](std::ostream &out, const auto &v) { vertex_property_writer(out, v); };
     auto edgeWriter = [this](std::ostream &out, const auto &e) { edge_property_writer(out, e); };
-    b::write_graphviz(dotFile, graph_, vertexWriter, edgeWriter);
+    auto propertiesWriter = [this](std::ostream &out) { graph_properties_writer(out); };
+    b::write_graphviz(dotFile, graph_, vertexWriter, edgeWriter, propertiesWriter);
     if (render_pdf) {
       convert_dot_to_pdf(indexed_filename + ".dot", indexed_filename + ".pdf");
     }
@@ -561,12 +512,12 @@ public:
    * vertices.
    * @return The descriptor of the newly duplicated vertex.
    */
-  TemplatedVertex duplicate_vertex(int id_to_duplicate, CloneVertexFunction<VertexProperties> cvf,
-                                   ModifyVertexPairFunction<VertexProperties> mvpf) {
-    TemplatedVertex vertex_to_duplicate;
+  VertexDescriptor duplicate_vertex(int id_to_duplicate, CloneVertexFunction<VertexProperties> cvf,
+                                    ModifyVertexPairFunction<VertexProperties> mvpf) {
+    VertexDescriptor vertex_to_duplicate;
     bool found = false;
     // Search for the vertex with the given ID.
-    for (TemplatedVertex v : b::make_iterator_range(b::vertices(graph_))) {
+    for (VertexDescriptor v : b::make_iterator_range(b::vertices(graph_))) {
       if (graph_[v]->id() == id_to_duplicate) {
         vertex_to_duplicate = v;
         found = true;
@@ -578,17 +529,17 @@ public:
     }
     VertexProperties duplicated_vertex = cvf(graph_[vertex_to_duplicate]);
     // Create a new vertex with the same properties.
-    TemplatedVertex new_vertex = b::add_vertex(duplicated_vertex, graph_);
+    VertexDescriptor new_vertex = b::add_vertex(duplicated_vertex, graph_);
     // Duplicate the out-edges.
-    for (TemplatedEdge edge : b::make_iterator_range(b::out_edges(vertex_to_duplicate, graph_))) {
-      TemplatedVertex vtarget = b::target(edge, graph_);
+    for (EdgeDescriptor edge : b::make_iterator_range(b::out_edges(vertex_to_duplicate, graph_))) {
+      VertexDescriptor vtarget = b::target(edge, graph_);
       auto edge_pair = b::edge(vertex_to_duplicate, vtarget, graph_);
       assert(edge_pair.second);
       b::add_edge(new_vertex, vtarget, graph_[edge_pair.first], graph_);
     }
     // Duplicate the in-edges.
-    for (TemplatedEdge edge : b::make_iterator_range(b::in_edges(vertex_to_duplicate, graph_))) {
-      TemplatedVertex vsource = b::source(edge, graph_);
+    for (EdgeDescriptor edge : b::make_iterator_range(b::in_edges(vertex_to_duplicate, graph_))) {
+      VertexDescriptor vsource = b::source(edge, graph_);
       auto edge_pair = b::edge(vsource, vertex_to_duplicate, graph_);
       assert(edge_pair.second);
       b::add_edge(vsource, new_vertex, graph_[edge_pair.first], graph_);
@@ -604,17 +555,17 @@ public:
    * @param v The vertex after which the new vertex will be added.
    * @param new_vertex_properties The properties of the new vertex to add.
    */
-  void add_vertex_after_vertex(TemplatedVertex v, const VertexProperties &new_vertex_properties) {
+  void add_vertex_after_vertex(VertexDescriptor v, const VertexProperties &new_vertex_properties) {
     // Add the new vertex with the provided properties.
-    TemplatedVertex new_vertex = b::add_vertex(new_vertex_properties, graph_);
+    VertexDescriptor new_vertex = b::add_vertex(new_vertex_properties, graph_);
     // Transfer outgoing edges from 'v' to 'new_vertex'.
-    std::vector<TemplatedVertex> out_vertices;
-    for (TemplatedEdge edge : b::make_iterator_range(b::out_edges(v, graph_))) {
-      TemplatedVertex target = b::target(edge, graph_);
+    std::vector<VertexDescriptor> out_vertices;
+    for (EdgeDescriptor edge : b::make_iterator_range(b::out_edges(v, graph_))) {
+      VertexDescriptor target = b::target(edge, graph_);
       out_vertices.push_back(target);
     }
     // Remove old edges and add new edges.
-    for (TemplatedVertex out_v : out_vertices) {
+    for (VertexDescriptor out_v : out_vertices) {
       b::remove_edge(v, out_v, graph_);
       b::add_edge(new_vertex, out_v, graph_);
     }
@@ -632,37 +583,49 @@ public:
    */
   template <typename Predicate>
   void add_vertex_after_pred(Predicate pred, const VertexProperties &new_vertex_properties) {
-    std::vector<TemplatedVertex> vertices_add_after;
-    for (TemplatedVertex v : b::make_iterator_range(b::vertices(graph_))) {
+    std::vector<VertexDescriptor> vertices_add_after;
+    for (VertexDescriptor v : b::make_iterator_range(b::vertices(graph_))) {
       if (pred(graph_[v])) {
         vertices_add_after.push_back(v);
       }
     }
-    for (TemplatedVertex v : vertices_add_after) {
+    for (VertexDescriptor v : vertices_add_after) {
       add_vertex_after_vertex(v, new_vertex_properties->clone());
     }
   }
 
+  /**
+   * @brief Removes all vertices that satisfy a predicate and reconnects edges.
+   *
+   * For every matching vertex, in-edges are rewired to all out-vertices
+   * (excluding self-loops) before the vertex is cleared and erased. Vertex
+   * removal is processed in descending descriptor order to keep descriptors
+   * valid during mutation.
+   *
+   * @tparam Predicate Callable that accepts vertex properties and returns true
+   * when the vertex should be removed.
+   * @param pred Predicate applied to each vertex.
+   */
   template <typename Predicate> void remove_vertex_pred(Predicate pred) {
-    std::vector<TemplatedVertex> vertices_to_remove;
-    for (TemplatedVertex v : b::make_iterator_range(b::vertices(graph_))) {
+    std::vector<VertexDescriptor> vertices_to_remove;
+    for (VertexDescriptor v : b::make_iterator_range(b::vertices(graph_))) {
       if (pred(graph_[v])) {
         vertices_to_remove.push_back(v);
       }
     }
-    for (TemplatedVertex v : vertices_to_remove) {
-      std::vector<TemplatedVertex> in_vertices;
-      std::vector<TemplatedVertex> out_vertices;
+    for (VertexDescriptor v : vertices_to_remove) {
+      std::vector<VertexDescriptor> in_vertices;
+      std::vector<VertexDescriptor> out_vertices;
       // Collecting in-vertices and out-vertices.
-      for (TemplatedEdge edge : b::make_iterator_range(b::in_edges(v, graph_))) {
+      for (EdgeDescriptor edge : b::make_iterator_range(b::in_edges(v, graph_))) {
         in_vertices.push_back(source(edge, graph_));
       }
-      for (TemplatedEdge edge : b::make_iterator_range(b::out_edges(v, graph_))) {
+      for (EdgeDescriptor edge : b::make_iterator_range(b::out_edges(v, graph_))) {
         out_vertices.push_back(target(edge, graph_));
       }
       // Redirecting in-edges of v to each of its out-vertices.
-      for (TemplatedVertex in_v : in_vertices) {
-        for (TemplatedVertex out_v : out_vertices) {
+      for (VertexDescriptor in_v : in_vertices) {
+        for (VertexDescriptor out_v : out_vertices) {
           if (in_v != out_v) { // Avoid self-loops.
             b::add_edge(in_v, out_v, graph_);
           }
@@ -670,41 +633,61 @@ public:
       }
     }
     // Sort vertices in descending order to maintain valid descriptors.
-    std::ranges::sort(vertices_to_remove, std::greater<TemplatedVertex>());
-    for (TemplatedVertex v : vertices_to_remove) {
+    std::ranges::sort(vertices_to_remove, std::greater<VertexDescriptor>());
+    for (VertexDescriptor v : vertices_to_remove) {
       clear_vertex(v, graph_);
       remove_vertex(v, graph_);
     }
   }
 
-  void add_vertex_before_vertex(TemplatedVertex v, const VertexProperties &new_vertex_properties) {
+  /**
+   * @brief Inserts a vertex immediately before an existing vertex.
+   *
+   * Transfers all incoming edges of @p v to the new vertex and adds a single
+   * edge from the new vertex into @p v, effectively splitting inbound traffic
+   * through the new vertex.
+   *
+   * @param v Vertex to insert in front of
+   * @param new_vertex_properties Properties to assign to the inserted vertex
+   */
+  void add_vertex_before_vertex(VertexDescriptor v, const VertexProperties &new_vertex_properties) {
     // Add the new vertex with the provided properties.
-    TemplatedVertex new_vertex = b::add_vertex(new_vertex_properties, graph_);
+    VertexDescriptor new_vertex = b::add_vertex(new_vertex_properties, graph_);
 
     // Transfer incoming edges from 'v' to 'new_vertex'.
-    std::vector<TemplatedVertex> in_vertices;
-    for (TemplatedEdge edge : b::make_iterator_range(b::in_edges(v, graph_))) {
-      TemplatedVertex source = b::source(edge, graph_);
+    std::vector<VertexDescriptor> in_vertices;
+    for (EdgeDescriptor edge : b::make_iterator_range(b::in_edges(v, graph_))) {
+      VertexDescriptor source = b::source(edge, graph_);
       in_vertices.push_back(source);
     }
 
     // Remove old edges and add new edges.
-    for (TemplatedVertex in_v : in_vertices) {
+    for (VertexDescriptor in_v : in_vertices) {
       b::remove_edge(in_v, v, graph_);
       b::add_edge(in_v, new_vertex, graph_);
     }
     b::add_edge(new_vertex, v, graph_);
   }
 
+  /**
+   * @brief Inserts a vertex before every vertex that satisfies a predicate.
+   *
+   * Copies vertex properties via @c clone() for each match to avoid sharing
+   * instances between insertions.
+   *
+   * @tparam Predicate Callable returning true when a vertex should be preceded.
+   * @param pred Predicate applied to vertex properties.
+   * @param new_vertex_properties Prototype properties for the inserted vertex.
+   */
   template <typename Predicate>
   void add_vertex_before_pred(Predicate pred, const VertexProperties &new_vertex_properties) {
-    std::vector<TemplatedVertex> vertices_add_before;
-    for (TemplatedVertex v : b::make_iterator_range(b::vertices(graph_))) {
+    std::vector<VertexDescriptor> vertices_add_before;
+    for (VertexDescriptor v : b::make_iterator_range(b::vertices(graph_))) {
       if (pred(graph_[v])) {
         vertices_add_before.push_back(v);
       }
     }
-    for (TemplatedVertex v : vertices_add_before) {
+    for (VertexDescriptor v : vertices_add_before) {
       add_vertex_before_vertex(v, new_vertex_properties->clone());
     }
   }
@@ -722,24 +705,24 @@ public:
    * @param can_merge A predicate that takes two vertices and returns true if
    * they can be merged.
    */
-  void merge_vertices(TemplatedVertex v1, TemplatedVertex v2,
-                      std::function<bool(TemplatedVertex, TemplatedVertex)> can_merge) {
+  void merge_vertices(VertexDescriptor v1, VertexDescriptor v2,
+                      std::function<bool(VertexDescriptor, VertexDescriptor)> can_merge) {
     if (!can_merge(v1, v2)) {
       std::cout << "Cannot merge these vertices" << std::endl;
       return;
     }
     // Redirect in-edges and out-edges of v2 to v1, avoiding duplicates.
-    std::unordered_set<std::pair<TemplatedVertex, TemplatedVertex>, pair_hash> unique_edges;
+    std::unordered_set<std::pair<VertexDescriptor, VertexDescriptor>, pair_hash> unique_edges;
     // Redirect in-edges.
-    for (TemplatedEdge edge : b::make_iterator_range(b::in_edges(v2, graph_))) {
-      TemplatedVertex src = b::source(edge, graph_);
+    for (EdgeDescriptor edge : b::make_iterator_range(b::in_edges(v2, graph_))) {
+      VertexDescriptor src = b::source(edge, graph_);
       if (src != v1 && unique_edges.emplace(src, v1).second) {
         b::add_edge(src, v1, graph_);
       }
     }
     // Redirect out-edges.
-    for (TemplatedEdge edge : b::make_iterator_range(b::out_edges(v2, graph_))) {
-      TemplatedVertex targ = b::target(edge, graph_);
+    for (EdgeDescriptor edge : b::make_iterator_range(b::out_edges(v2, graph_))) {
+      VertexDescriptor targ = b::target(edge, graph_);
       if (targ != v1 && unique_edges.emplace(v1, targ).second) {
         b::add_edge(v1, targ, graph_);
       }
@@ -749,29 +732,43 @@ public:
     remove_vertex(v2, graph_);
   }
 
-  std::set<TemplatedVertex, std::greater<>> replace_subgraph(
+  /**
+   * @brief Replace a matched subgraph with a new graph.
+   *
+   * Adds all vertices/edges from @p ng into the current graph, maps them to the
+   * vertices being replaced as described by @p isomorphism, and reconnects
+   * external edges either via a custom @p reconnect_edges callback or a default
+   * root/leaf strategy. Vertices slated for removal are returned so callers can
+   * clean them up after edge reconstruction.
+   *
+   * @param ng Constructed replacement graph
+   * @param isomorphism Mapping from replacement vertices to matched vertices
+   * @param reconnect_edges Optional hook to override external edge rewiring
+   * @return Set of vertices that should be erased from the original graph
+   */
+  std::set<VertexDescriptor, std::greater<>> replace_subgraph(
       const GraphType &ng, IsoMap &isomorphism,
-      std::optional<
-          std::function<void(std::vector<TemplatedEdgeReplacementStruct>, std::vector<TemplatedEdgeReplacementStruct>,
-                             std::vector<TemplatedVertex>, std::vector<TemplatedVertex>, GraphType &)>>
+      std::optional<std::function<void(std::vector<GraphEdgeReplacementStruct>, std::vector<GraphEdgeReplacementStruct>,
+                                       std::vector<VertexDescriptor>, std::vector<VertexDescriptor>, GraphType &)>>
           reconnect_edges = std::nullopt) {
 
     // Create unique list of vertices to be removed from isomorphism, sorted
     // largest->smallest.
-    std::set<TemplatedVertex, std::greater<>> vertices_to_remove;
-    std::ranges::for_each(isomorphism | std::views::values, [&vertices_to_remove](std::vector<TemplatedVertex> &v_vec) {
-      auto s = std::set<TemplatedVertex>(v_vec.begin(), v_vec.end());
-      vertices_to_remove.insert(s.begin(), s.end());
-    });
+    std::set<VertexDescriptor, std::greater<>> vertices_to_remove;
+    std::ranges::for_each(isomorphism | std::views::values,
+                          [&vertices_to_remove](std::vector<VertexDescriptor> &v_vec) {
+                            auto s = std::set<VertexDescriptor>(v_vec.begin(), v_vec.end());
+                            vertices_to_remove.insert(s.begin(), s.end());
+                          });
 
-    std::map<TemplatedVertex, TemplatedVertex> ng_vertices_map;
+    std::map<VertexDescriptor, VertexDescriptor> ng_vertices_map;
     // More than one old node may be associated with a new node.
     IsoMap new_vertices_map;
-    std::vector<TemplatedVertex> roots;
-    std::vector<TemplatedVertex> leaves;
+    std::vector<VertexDescriptor> roots;
+    std::vector<VertexDescriptor> leaves;
     // Add vertices of ng to g and create a mapping.
     BGL_FORALL_VERTICES_T(v, ng, GraphType) {
-      TemplatedVertex new_v = b::add_vertex(graph_);
+      VertexDescriptor new_v = b::add_vertex(graph_);
       graph_[new_v] = ng[v]; // Copy vertex properties.
       if (in_degree(v, ng) == 0) {
         roots.push_back(new_v);
@@ -780,7 +777,7 @@ public:
         leaves.push_back(new_v);
       }
       if (isomorphism.contains(v)) {
-        for (TemplatedVertex old_v : isomorphism[v])
+        for (VertexDescriptor old_v : isomorphism[v])
           new_vertices_map[old_v].push_back(new_v);
       }
       ng_vertices_map[v] = new_v;
@@ -792,16 +789,16 @@ public:
       b::add_edge(ng_vertices_map[src], ng_vertices_map[targ], ng[e], graph_);
     }
     // Build lists of external facing edges.
-    std::vector<TemplatedEdgeReplacementStruct> external_incoming_edges;
-    std::vector<TemplatedEdgeReplacementStruct> external_outgoing_edges;
+    std::vector<GraphEdgeReplacementStruct> external_incoming_edges;
+    std::vector<GraphEdgeReplacementStruct> external_outgoing_edges;
     // Function for collecting external facing incoming and outgoing edges.
-    auto external_edge_lambda = [*this, &vertices_to_remove](bool in, TemplatedVertex original_vertex,
-                                                             TemplatedVertex replacement_vertex, auto edges,
-                                                             std::vector<TemplatedEdgeReplacementStruct> &edge_list) {
-      for (TemplatedEdge edge : b::make_iterator_range(edges)) { // Iterate over edges connecting
-                                                                 // to original_vertex.
+    auto external_edge_lambda = [*this, &vertices_to_remove](bool in, VertexDescriptor original_vertex,
+                                                             VertexDescriptor replacement_vertex, auto edges,
+                                                             std::vector<GraphEdgeReplacementStruct> &edge_list) {
+      for (EdgeDescriptor edge : b::make_iterator_range(edges)) { // Iterate over edges connecting
+                                                                  // to original_vertex.
         // Get the src or target of the edge.
-        TemplatedVertex src_trg = in ? b::source(edge, graph_) : b::target(edge, graph_);
+        VertexDescriptor src_trg = in ? b::source(edge, graph_) : b::target(edge, graph_);
         if (std::ranges::find(vertices_to_remove, src_trg) != vertices_to_remove.end()) // Don't include internal edges.
           continue;
         // Log the source or target edge with its original/new counterpart
@@ -813,10 +810,10 @@ public:
     for (const auto &original_vertex : vertices_to_remove) {
       // Get the vertices in the new subgraph that the original target vertex
       // corresponds to if they exist.
-      std::vector<TemplatedVertex> replacement_vertices = new_vertices_map.contains(original_vertex)
-                                                              ? new_vertices_map[original_vertex]
-                                                              : std::vector<TemplatedVertex>({ULONG_MAX});
-      for (TemplatedVertex replacement_vertex : replacement_vertices) { // Iterate over new vertices.
+      std::vector<VertexDescriptor> replacement_vertices = new_vertices_map.contains(original_vertex)
+                                                               ? new_vertices_map[original_vertex]
+                                                               : std::vector<VertexDescriptor>({ULONG_MAX});
+      for (VertexDescriptor replacement_vertex : replacement_vertices) { // Iterate over new vertices.
         external_edge_lambda(true, original_vertex, replacement_vertex, b::in_edges(original_vertex, graph_),
                              external_incoming_edges);
         external_edge_lambda(false, original_vertex, replacement_vertex, b::out_edges(original_vertex, graph_),
@@ -841,30 +838,38 @@ public:
         }
       }
     }
-    // for (auto vertex_to_remove : vertices_to_remove) {
-    //   b::clear_vertex(vertex_to_remove, graph_);
-    //   b::remove_vertex(vertex_to_remove, graph_);
-    // }
     return vertices_to_remove;
   }
 
   /**
-   * Reassign the IDs of nodes to match their indices in the graph.
-   * This might be necessary after mutations in the graph. Applying
-   * isomorphisms calls this transparently already.
+   * @brief Reassign IDs based on graph directionality.
+   *
+   * Separate functions are required for directed and undirected graphs, since the
+   * concept of a root doesn't exist in an undirected graph.
    */
   void fix_vertex_obj_ids()
+    requires NodeLike<VertexProperties>
+  {
+    fix_vertex_obj_ids_impl<DirectionProperty_>();
+  }
+
+protected:
+  /**
+   * @brief Helper implementing ID reassignment for directed graphs.
+   */
+  template <typename DP, typename std::enable_if_t<!std::is_same_v<DP, b::undirectedS>, int> = 0>
+  void fix_vertex_obj_ids_impl()
     requires NodeLike<VertexProperties>
   {
     // BFS Visitor to adjust the IDs of each vertex class (NOT the associated
     // vertices).
     struct custom_bfs_visitor : public b::default_bfs_visitor {
-      GraphType &gref_;
-      int &id_counter_;
+      GraphType &gref_; ///< Graph reference providing access to vertex properties.
+      int &id_counter_; ///< Counter used to assign sequential IDs.
 
       custom_bfs_visitor(GraphType &graph, int &id_counter) : gref_(graph), id_counter_(id_counter) {}
 
-      void discover_vertex(TemplatedVertex v, const GraphType &) {
+      void discover_vertex(VertexDescriptor v, const GraphType &) {
         auto &cls = gref_[v];
         if (cls->id() == -1) {
           cls->id(id_counter_);
@@ -872,12 +877,12 @@ public:
         }
       }
 
-      void finish_vertex(TemplatedVertex v, const GraphType &) {}
+      void finish_vertex(VertexDescriptor, const GraphType &) {}
     };
 
     // First, discover all root vertices.
-    std::vector<TemplatedVertex> root_vertices;
-    for (TemplatedVertex v : b::make_iterator_range(b::vertices(graph_))) {
+    std::vector<VertexDescriptor> root_vertices;
+    for (VertexDescriptor v : b::make_iterator_range(b::vertices(graph_))) {
       graph_[v]->id(-1);
       if (b::in_degree(v, graph_) == 0) {
         root_vertices.push_back(v);
@@ -892,10 +897,23 @@ public:
   }
 
   /**
+   * @brief Helper for undirected graphs.
+   */
+  template <typename DP, typename std::enable_if_t<std::is_same_v<DP, b::undirectedS>, int> = 0>
+  void fix_vertex_obj_ids_impl()
+    requires NodeLike<VertexProperties>
+  {
+    for (VertexDescriptor v : b::make_iterator_range(b::vertices(graph_))) {
+      graph_[v]->id(v);
+    }
+  }
+
+public:
+  /**
    * @brief Extension point for [write_graph]. Write the attributes of the
    * vertex in dot format to the output stream.
    */
-  virtual void vertex_property_writer(std::ostream &out, const TemplatedVertex &v) const {
+  virtual void vertex_property_writer(std::ostream &out, const VertexDescriptor &v) const {
     out << "[shape=rectangle, label=\"" << v << ":" << this->graph_[v]->id() << "\"]";
   }
 
@@ -903,10 +921,23 @@ public:
    * @brief Extension point for [write_graph]. Write the attributes of the edge
    * in dot format to the output stream.
    */
-  virtual void edge_property_writer(std::ostream &out, const TemplatedEdge &) const { out << "[label=\"\"]"; }
+  virtual void edge_property_writer(std::ostream &out, const EdgeDescriptor &) const { out << "[label=\"\"]"; }
+
+  /**
+   * @brief Extension point for [write_graph]. Write the attributes of the
+   * vertex in dot format to the output stream.
+   */
+  virtual void graph_properties_writer(std::ostream &out) const { return; }
 
   void set_base_graph(const GraphType &g) { graph_ = g; }
+
+  std::size_t num_vertices() const { return b::num_vertices(graph_); }
 };
+
+template <typename VertexProperties, typename EdgeProperties = b::no_property>
+using DirectedExtendedGraph = ExtendedGraph<VertexProperties, b::bidirectionalS, EdgeProperties>;
+template <typename VertexProperties, typename EdgeProperties = b::no_property>
+using UndirectedExtendedGraph = ExtendedGraph<VertexProperties, b::undirectedS, EdgeProperties>;
 
 } // namespace ghl
 #endif

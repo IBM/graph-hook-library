@@ -3,7 +3,7 @@ new file mode 100644
 index 00000000..d5b25292
 --- /dev/null
 +++ b/libs/graph/include/boost/graph/vf3_sub_graph_iso.hpp
-@@ -0,0 +1,1026 @@
+@@ -0,0 +1,1022 @@
 +#ifndef BOOST_VF3_SUB_GRAPH_ISO_HPP
 +#define BOOST_VF3_SUB_GRAPH_ISO_HPP
 +
@@ -61,9 +61,9 @@ index 00000000..d5b25292
 +        vf3_state(): matcher_ptr(nullptr) {}
 +        vf3_state(matcher<GraphSmall_, GraphLarge_, SmallGraphVertexClassMap_, LargeGraphVertexClassMap_, SubgraphIsoUserCallback_, VertexEquivalencePredicate_, EdgeEquivalencePredicate_>* m,
 +                LargeVertexType v_large = graph_traits<GraphLarge_>::null_vertex(), SmallVertexType v_small = graph_traits<GraphSmall_>::null_vertex())
-+        : v_large_(v_large)
++        : matcher_ptr(m)
++        , v_large_(v_large)
 +        , v_small_(v_small)
-+        , matcher_ptr(m)
 +        {
 +            auto& matcher_ = *matcher_ptr;
 +            depth_ = matcher_.core_large_.size();
@@ -329,7 +329,6 @@ index 00000000..d5b25292
 +            size_t depth = core_small_.size();
 +
 +            SmallVertexType v_small_next;
-+            LargeVertexType v_large_next;
 +            if (state_.v_small_ != graph_traits<GraphSmall>::null_vertex() || depth < node_order_.size())
 +            {
 +                if(state_.v_small_ == graph_traits<GraphSmall>::null_vertex())
@@ -503,7 +502,6 @@ index 00000000..d5b25292
 +            dynamic_bitset<> s_large_cls_nodes(num_large_vertices_);
 +            dynamic_bitset<> v_large_cls_nodes(num_large_vertices_);
 +
-+            int i=0;
 +
 +            for(const auto& [cls, index]: class_index_map_)
 +            {
@@ -902,8 +900,6 @@ index 00000000..d5b25292
 +    SubgraphIsoUserCallback& callback
 +)
 +{
-+    using SmallVertexType = typename graph_traits<GraphSmall>::vertex_descriptor;
-+    using LargeVertexType = typename graph_traits<GraphLarge>::vertex_descriptor;
 +
 +    detail::default_vertex_class_map<GraphSmall> small_map;
 +    detail::default_vertex_class_map<GraphLarge> large_map;
@@ -1030,4 +1026,3 @@ index 00000000..d5b25292
 +#endif
 +
 +#endif // BOOST_VF3_SUB_GRAPH_ISO_HPP
-\ No newline at end of file

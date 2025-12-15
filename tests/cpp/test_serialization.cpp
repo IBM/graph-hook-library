@@ -107,9 +107,9 @@ TEST(Serialization, BaseNode) {
  */
 TEST(Serialization, Graph) {
   // Type aliases for graph components
-  using TemplatedEdge = std::shared_ptr<ghl::PrimitiveEdge>;
-  using TemplatedVertex = std::shared_ptr<ghl::BaseNode>;
-  using GraphType = ghl::Graph<TemplatedVertex, TemplatedEdge>;
+  using EdgeDescriptor = std::shared_ptr<ghl::PrimitiveEdge>;
+  using VertexDescriptor = std::shared_ptr<ghl::BaseNode>;
+  using GraphType = ghl::DirectedGraph<VertexDescriptor, EdgeDescriptor>;
 
   // Construct test graph with known structure
   auto graph = GraphType();

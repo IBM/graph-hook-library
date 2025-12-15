@@ -55,27 +55,33 @@ namespace ghl {
  * @see examples/02_isomorphism.cpp for usage examples.
  *
  * @tparam VertexProperties The type of vertex properties in the graph.
+ * @tparam DirectionProperty The directionality tag for the underlying graph
+ * (e.g., boost::bidirectionalS or boost::undirectedS).
  * @tparam EdgeProperties The type of edge properties in the graph (defaults to
  * boost::no_property).
  */
-template <typename VertexProperties, typename EdgeProperties = boost::no_property> class Isomorphism {
+template <typename VertexProperties_, typename DirectionProperty_, typename EdgeProperties_ = boost::no_property>
+class Isomorphism {
 public:
-  using GraphType = Graph<VertexProperties, EdgeProperties>;
-  using TemplatedVertex = Vertex<VertexProperties, EdgeProperties>;
-  using TemplatedEdge = Edge<VertexProperties, EdgeProperties>;
-  using IsoMap = std::map<TemplatedVertex, std::vector<TemplatedVertex>>;
+  using GraphType = Graph<VertexProperties_, DirectionProperty_, EdgeProperties_>; ///< Graph type alias.
+  using VertexDescriptor = GraphType::vertex_descriptor;                           ///< Descriptor for vertices.
+  using EdgeDescriptor = GraphType::edge_descriptor;                               ///< Descriptor for edges.
+  using VertexProperties = VertexProperties_;                                      ///< Vertex property type.
+  using DirectionProperty = DirectionProperty_;                                    ///< Graph direction selector.
+  using EdgeProperties = EdgeProperties_;                                          ///< Edge property type.
+  using IsoMap = std::map<VertexDescriptor, std::vector<VertexDescriptor>>;        ///< Pattern-to-target vertex map.
 
   /** @brief Function type for specializing discovered isomorphisms */
   using SpecializeIsoFunction = std::function<IsoMap(const GraphType &graph, const IsoMap &isomorphism)>;
 
   /** @brief Function type for comparing vertices during isomorphism detection
    */
-  using VertexCompFunction =
-      std::function<bool(const GraphType &G1, const GraphType &G2, const TemplatedVertex v1, const TemplatedVertex v2)>;
+  using VertexCompFunction = std::function<bool(const GraphType &G1, const GraphType &G2, const VertexDescriptor v1,
+                                                const VertexDescriptor v2)>;
 
   /** @brief Function type for comparing edges during isomorphism detection */
   using EdgeCompFunction =
-      std::function<bool(const GraphType &G1, const GraphType &G2, const TemplatedEdge e1, const TemplatedEdge e2)>;
+      std::function<bool(const GraphType &G1, const GraphType &G2, const EdgeDescriptor e1, const EdgeDescriptor e2)>;
 
   /** @brief Function type for validating discovered isomorphisms */
   using IsIsomorphismValidFunction = std::function<bool(const GraphType &graph, const IsoMap &isomorphism)>;
@@ -84,20 +90,24 @@ public:
    * transformation */
   using ConstructDesiredGraphFunction = std::function<GraphType(GraphType input_graph)>;
 
-  using TemplatedEdgeReplacementStruct = EdgeReplacementStruct<VertexProperties, EdgeProperties>;
+  using TemplatedEdgeReplacementStruct =
+      EdgeReplacementStruct<VertexProperties, DirectionProperty, EdgeProperties>; ///< Edge replacement helper type.
 
   /** @brief Optional function type for reconstructing edges after
    * transformation */
   using ReconstructEdgesFunction = std::optional<
       std::function<void(std::vector<TemplatedEdgeReplacementStruct>, std::vector<TemplatedEdgeReplacementStruct>,
-                         std::vector<TemplatedVertex>, std::vector<TemplatedVertex>, GraphType &)>>;
+                         std::vector<VertexDescriptor>, std::vector<VertexDescriptor>,
+                         GraphType &)>>; ///< Reconnect hook type.
 
   /** @brief Optional function type for in-place graph updates */
-  using InPlaceUpdateFunction = std::optional<std::function<void(GraphType &, const IsoMap &)>>;
+  using InPlaceUpdateFunction =
+      std::optional<std::function<void(GraphType &, const GraphType &, const IsoMap &)>>; ///< In-place update hook
+                                                                                          ///< type.
 
   // Original graph before any transformations
-  GraphType original_input_graph_;
-  GraphType input_graph_; //< Current working copy of the graph
+  GraphType original_input_graph_; ///< Original input graph copy.
+  GraphType input_graph_;          ///< Current working copy of the graph.
 
   /**
    * @brief Constructs an Isomorphism instance with the given input graph.
@@ -117,41 +127,41 @@ public:
    * @brief Helper struct for vertex comparison during isomorphism detection.
    */
   struct vertex_comp_helper {
-    const GraphType &G1_;
-    const GraphType &G2_;
-    VertexCompFunction vcf_;
+    const GraphType &G1_;    ///< Pattern graph reference.
+    const GraphType &G2_;    ///< Target graph reference.
+    VertexCompFunction vcf_; ///< Vertex comparison callback.
 
     vertex_comp_helper(const GraphType &G1, const GraphType &G2, VertexCompFunction vcf)
         : G1_(G1), G2_(G2), vcf_(vcf) {}
 
-    bool operator()(const TemplatedVertex v1, const TemplatedVertex v2) { return vcf_(G1_, G2_, v1, v2); }
+    bool operator()(const VertexDescriptor v1, const VertexDescriptor v2) { return vcf_(G1_, G2_, v1, v2); }
   };
 
   /**
    * @brief Helper struct for edge comparison during isomorphism detection.
    */
   struct edge_comp_helper {
-    const GraphType &G1_;
-    const GraphType &G2_;
-    EdgeCompFunction ecf_;
+    const GraphType &G1_;  ///< Pattern graph reference.
+    const GraphType &G2_;  ///< Target graph reference.
+    EdgeCompFunction ecf_; ///< Edge comparison callback.
 
     edge_comp_helper(const GraphType &G1, const GraphType &G2, EdgeCompFunction ecf) : G1_(G1), G2_(G2), ecf_(ecf) {}
 
-    bool operator()(const TemplatedEdge e1, const TemplatedEdge e2) const { return ecf_(G1_, G2_, e1, e2); }
+    bool operator()(const EdgeDescriptor e1, const EdgeDescriptor e2) const { return ecf_(G1_, G2_, e1, e2); }
   };
 
   /**
    * @brief Callback struct for collecting valid isomorphisms during search.
    */
   struct isomorphisms_callback {
-    GraphType &sg_;
-    const GraphType &g_;
-    std::vector<IsoMap> &valid_isomorphisms_;
-    bool discover_first_;
-    IsIsomorphismValidFunction is_isomorphism_valid_;
-    SpecializeIsoFunction specialize_isomorphism_;
-    bool nonoverlapping;
-    mutable std::unordered_set<TemplatedVertex> used_vertices_;
+    GraphType &sg_;                                              ///< Pattern graph reference.
+    const GraphType &g_;                                         ///< Target graph reference.
+    std::vector<IsoMap> &valid_isomorphisms_;                    ///< Accumulated valid mappings.
+    bool discover_first_;                                        ///< Stop after first valid mapping.
+    IsIsomorphismValidFunction is_isomorphism_valid_;            ///< Custom validation function.
+    SpecializeIsoFunction specialize_isomorphism_;               ///< Custom specialization function.
+    bool nonoverlapping;                                         ///< Enforce non-overlapping results.
+    mutable std::unordered_set<VertexDescriptor> used_vertices_; ///< Track used vertices for nonoverlap.
 
     isomorphisms_callback(GraphType &sg, const GraphType &g, std::vector<IsoMap> &iso, bool first,
                           IsIsomorphismValidFunction is_isomorphism_valid, SpecializeIsoFunction specialize_isomorphism,
@@ -167,7 +177,7 @@ public:
     template <typename CorrespondenceMap1To2, typename CorrespondenceMap2To1>
     bool operator()(CorrespondenceMap1To2 cm1, CorrespondenceMap2To1) const {
       IsoMap current_mapping;
-      std::vector<TemplatedVertex> current_vertices;
+      std::vector<VertexDescriptor> current_vertices;
       if (nonoverlapping) {
         current_vertices.reserve(boost::num_vertices(sg_));
       }
@@ -198,7 +208,7 @@ public:
    * @return Function object for comparing vertices.
    */
   virtual VertexCompFunction vertex_comp_function() {
-    return [](const GraphType &, const GraphType &, const TemplatedVertex, const TemplatedVertex) { return true; };
+    return [](const GraphType &, const GraphType &, const VertexDescriptor, const VertexDescriptor) { return true; };
   }
 
   /**
@@ -206,7 +216,7 @@ public:
    * @return Function object for comparing edges.
    */
   virtual EdgeCompFunction edge_comp_function() {
-    return [](const GraphType &, const GraphType &, const TemplatedEdge, const TemplatedEdge) { return true; };
+    return [](const GraphType &, const GraphType &, const EdgeDescriptor, const EdgeDescriptor) { return true; };
   }
 
   /**
@@ -259,11 +269,11 @@ public:
    *
    * @param sg The subgraph pattern to search for.
    * @param g The graph to search in.
-   * @param first If true, stops after finding the first valid isomorphism.
+   * @param first If true, stop after finding the first valid isomorphism.
    * @param is_isomorphism_valid_ Optional custom validation function.
    * @param specialize_isomorphism_ Optional custom specialization function.
-   * @param nonoverlapping Optional control for discovered isomorphisms.
-   * @param use_vf3 Whether to use VF2 or VF3.
+   * @param nonoverlapping When true, skip mappings that reuse vertices from prior matches.
+   * @param use_vf3 Whether to use VF3 (true) or VF2 (false).
    * @return Vector of valid isomorphism mappings.
    */
   virtual std::vector<IsoMap> discover(GraphType &sg, const GraphType &g, bool first, bool nonoverlapping = false,
@@ -322,6 +332,13 @@ public:
     return sgc;
   }
 };
+
+/// Isomorphism specialization for directed graphs.
+template <typename VertexProperties, typename EdgeProperties = b::no_property>
+using DirectedIsomorphism = Isomorphism<VertexProperties, b::bidirectionalS, EdgeProperties>;
+/// Isomorphism specialization for undirected graphs.
+template <typename VertexProperties, typename EdgeProperties = b::no_property>
+using UndirectedIsomorphism = Isomorphism<VertexProperties, b::undirectedS, EdgeProperties>;
 
 } // namespace ghl
 #endif

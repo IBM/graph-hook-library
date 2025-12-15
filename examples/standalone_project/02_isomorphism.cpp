@@ -40,7 +40,7 @@
 #include <filesystem>
 #include <ghl/ghl.h>
 #include <ghl/ghl_isomorphisms.h>
-using ImplementedIsomorphism = ghl::Isomorphism<VertexProperty, EdgeProperty>;
+using ImplementedIsomorphism = ghl::DirectedIsomorphism<VertexProperty, EdgeProperty>;
 
 /**
  * @brief Creates a sample map graph of Italian cities and their connecting
@@ -50,12 +50,12 @@ using ImplementedIsomorphism = ghl::Isomorphism<VertexProperty, EdgeProperty>;
  * etc.) connected by roads. Most cities have roads leading to Rome, except
  * Paris and Marseilles which are connected to each other.
  *
- * @return MapGraphType A graph containing the cities and their connecting roads
+ * @return MapGraph A graph containing the cities and their connecting roads
  */
-MapGraphType make_map() {
+MapGraph make_map() {
   // Initialize empty map graph
-  auto map = MapGraphType();
-  std::vector<MapGraphType::TemplatedVertex> city_vertices;
+  auto map = MapGraph();
+  std::vector<MapGraph::VertexDescriptor> city_vertices;
 
   // Add vertices (cities) with properties
   city_vertices.push_back(map.add_vertex(std::make_shared<City>("Rome")));
@@ -104,7 +104,7 @@ public:
    * @brief Constructs the isomorphism with a pattern graph.
    * @param iso_graph Graph pattern to match for transformation
    */
-  explicit Capitals(const MapGraphType::GraphType &iso_graph, std::set<std::string> capitals)
+  explicit Capitals(const MapGraph::GraphType &iso_graph, std::set<std::string> capitals)
       : ImplementedIsomorphism(iso_graph), capitals_(capitals) {};
 
   /**
@@ -112,8 +112,8 @@ public:
    * @return Function implementing vertex comparison logic
    */
   VertexCompFunction vertex_comp_function() final {
-    return [this](const GraphType &iso_graph, const GraphType &target_graph, const TemplatedVertex target_vertex,
-                  const TemplatedVertex iso_vertex) {
+    return [this](const GraphType &iso_graph, const GraphType &target_graph, const VertexDescriptor target_vertex,
+                  const VertexDescriptor iso_vertex) {
       auto target_city = std::dynamic_pointer_cast<City>(target_graph[target_vertex]);
       return target_city && this->capitals_.find(target_city->name()) != this->capitals_.end();
     };
@@ -124,7 +124,7 @@ public:
    * @return Function implementing edge comparison logic
    */
   EdgeCompFunction edge_comp_function() final {
-    return [](const GraphType &, const GraphType &, const TemplatedEdge, const TemplatedEdge) { return true; };
+    return [](const GraphType &, const GraphType &, const EdgeDescriptor, const EdgeDescriptor) { return true; };
   }
 
   /**
@@ -140,7 +140,7 @@ public:
    */
   IsoMap specialize_isomorphism(const GraphType &graph, const IsoMap &isomorphism) final {
     IsoMap ret_iso;
-    TemplatedVertex iso_vertex = 0;
+    VertexDescriptor iso_vertex = 0;
     for (auto edge : b::make_iterator_range(b::in_edges(isomorphism.at(0)[0], graph))) {
       if (b::out_degree(b::source(edge, graph), graph) == 1) {
         ret_iso[iso_vertex].push_back(b::source(edge, graph));
@@ -214,7 +214,7 @@ public:
   ReconstructEdgesFunction reconstruct_edges_function() final {
     return [](const std::vector<TemplatedEdgeReplacementStruct> &external_incoming_edges,
               const std::vector<TemplatedEdgeReplacementStruct> &external_outgoing_edges,
-              const std::vector<TemplatedVertex> &, const std::vector<TemplatedVertex> &, GraphType &graph) {
+              const std::vector<VertexDescriptor> &, const std::vector<VertexDescriptor> &, GraphType &graph) {
       // Reconstruct incoming edges
       for (auto &[src, _old_trg, new_trg, i_edge_properties] : external_incoming_edges) {
         boost::add_edge(src, new_trg, i_edge_properties, graph);
@@ -242,16 +242,16 @@ public:
  */
 int main(int argc, char *argv[]) {
   // Create initial graph with roads leading to Rome
-  MapGraphType map = make_map();
+  MapGraph map = make_map();
   std::filesystem::create_directories("output");
   map.write_graph("output/original_graph");
 
   // Create and apply the transformation
-  auto isomorphism_graph = ghl::Graph<VertexProperty, EdgeProperty>();
+  auto isomorphism_graph = ghl::DirectedGraph<VertexProperty, EdgeProperty>();
   b::add_vertex(std::make_shared<City>("Capital", false, -1), isomorphism_graph);
   std::set<std::string> capitals = {"Paris", "Rome"};
   auto isomorphism = std::make_shared<Capitals>(isomorphism_graph, capitals);
-  ghl::apply_isomorphism<VertexProperty, EdgeProperty>(map, isomorphism, true, false);
+  ghl::apply_isomorphism(map, isomorphism, true, false);
 
   // Output the transformed graph
   map.write_graph("output/transformed_graph");

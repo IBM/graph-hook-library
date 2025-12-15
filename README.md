@@ -1,26 +1,44 @@
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/8f08f1b3-b208-4d22-9136-57c6f28a3787" width="25%">
+  <img src="./logo.svg" width="25%">
 </p>
 
 <div align="center">
   <h1>Graph Hook Library (GHL)</h1>
 </div>
 Is a standalone C++ header-only generic graph library built upon the Boost Graph Library.
-<p></p>
 
 
 > The primary feature of the GHL is to provide a robust environment for developing and applying graph transformations or isomorphisms. These isomorphisms can either be contingent on the properties of the graph, such as the edge in or out degree of vertices, or con the subclassed properties of the vertex, such as class type or the value of a class member.
+
+## Note for ICSA reviewers
+Thank-you for taking the time to review our work. You will find the code necessary to replicate the results of our submission in the ICSA directory.
 
 ## Authors
 The GHL was developed with Corey Lammie, Hadjer Benmeziane, Tunaberk Almaci, and William Simon, as the initial core authors.
 
 ## Setup/Installation
+
+#### Dependencies
+
+The GHL relies on pybind11, which may be installed via `pip install pybind11`.
+
+Secondly, the library makes use of C++20 features, particularly std::format. If attempting to install the library results in compilation errors, it is likely that the compiler being used does not support these features. It is recommended in such cases to use a conda environment, e.g:
+```
+conda create -n ghl gxx>=13.3.0 cmake python=3.11
+````
+
 The GHL can be setup/installed in two different ways:
 
 #### 1. As a Python-based library:
-For sake of convenience, we provide a Python package with bindings, that can be installed using:
+<!-- For sake of convenience, we provide a Python package with bindings, that can be installed using:
 
-`pip install git+https://github.com/IBM/graph-hook-library.git`
+`pip install git+https://github.com/IBM/graph-hook-library.git` -->
+
+Until open-sourced, the GHL can be installed by calling
+
+`pip install -e .`
+
+from the top-level directory.
 
 It can then be used as follows:
 
@@ -110,4 +128,4 @@ pytest tests/python -s # If bindings are enabled.
 ## Contributing
 Before contributing, please lint code using the following commands (clang-format and black are required):
 1. `./run-clang-format.py -r include -i && ./run-clang-format.py -r tests/cpp -i`
-2. `black . --check`
+2. `black tests/python`
