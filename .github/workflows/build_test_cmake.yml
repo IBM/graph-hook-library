@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: |
          sudo apt install build-essential
-         pip install pytest
+         pip install pytest pybind11
          mkdir build && cd build
          cmake .. -DGHL_SERIALIZATION=ON -DGHL_BINDINGS=ON -DCMAKE_INSTALL_PREFIX:PATH=install
          cmake --build . --target install
