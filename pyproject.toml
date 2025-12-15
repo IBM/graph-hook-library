@@ -23,7 +23,8 @@ requires = [
     "py-build-cmake~=0.6.0a2",
     "pybind11-stubgen~=2.5.5",
     "ninja>=1.10",
-    "cmake>=3.16"
+    "cmake>=3.16",
+    "pybind11>=3.0.0"
 ]
 build-backend = "py_build_cmake.build"
 
