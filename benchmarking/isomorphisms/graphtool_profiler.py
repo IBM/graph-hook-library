@@ -23,7 +23,6 @@ from benchmark import benchmark
 import utils
 import sys
 
-
 target_graph_path, subgraph_path, n, output_path, debug = utils.parse_arguments()
 if utils.check_for_precomputed(target_graph_path, subgraph_path, output_path):
     if debug:

@@ -249,7 +249,7 @@ endif()
 if(GHL_MASTER_PROJECT)
   add_subdirectory(tests/cpp)
   add_subdirectory(examples/cpp)
-  add_subdirectory(ICSA/vf2_vf3)
+  add_subdirectory(benchmarking/vf2_vf3)
 
   if(GHL_BINDINGS)
     add_custom_command(

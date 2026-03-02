@@ -1,11 +1,11 @@
-# ICSA Submission Companion
+# ICGT Submission Companion
 
-This repository contains the artifacts accompanying the paper compiled at `ICSA/publication/main.tex`. The layout below helps you locate code, data, and supporting materials referenced in the manuscript.
+This folder contains code necessary to generate results presented in the contained appendix to the ICTG 2026 tool paper submission. 
+The layout below helps you locate code, data, and supporting materials referenced in the manuscript.
 
 ## Folder Structure
-- `publication/`: LaTeX source of the ICSA paper and related assets.
-- `vf2_vf3/`:  Code for generating Tables II and III and Figure 3.
-- `isomorphisms/`:  Code for generating Table IV.
+- `vf2_vf3/`:  Code for generating Tables I and II and Figure 3.
+- `isomorphisms/`:  Code for generating Table III
 - `dnn/`:  Code for generating Figure 4.
 - `ghlchem/`:  Code for generating Figures 5 and 6.
 - `cities/`:  Isomorphism of Figure 2
@@ -32,10 +32,10 @@ cmake --build . --target install
 ```
 Note the dependencies described in the top level README.
 
-This copies the `vf3_vs_vf2` program to `vf2_vf3/`. Run `run_vf3_vf2_profile.sh` to generate results. `stride` and `start_index` can be used to parallelize the benchmarks across compute nodes if operating in such an environment, otherwise, leaving them unset runs all tests serially. Full benchmarks are long-running (each data point up to 5 minutes; VF2 failed on 696 tests in our experiments, leading to a minimum serialized runtime of 58 hours). Calculated results are included in `vf2_vf3/results/`. Use `report_results.py` to generate Tables II and III and Figure 3.
+This copies the `vf3_vs_vf2` program to `vf2_vf3/`. Run `run_vf3_vf2_profile.sh` to generate results. `stride` and `start_index` can be used to parallelize the benchmarks across compute nodes if operating in such an environment, otherwise, leaving them unset runs all tests serially. Full benchmarks are long-running (each data point up to 5 minutes; VF2 failed on 696 tests in our experiments, leading to a minimum serialized runtime of 58 hours). Calculated results are included in `vf2_vf3/results/`. Use `report_results.py` to generate Tables I and II and Figure 3.
 
 ## isomorphisms
-Generates Table IV by calling iGraph, NetworkX, GraphTool and the GHL on the SI dataset. These runs are also long-running, we have therefore included our results in the `results\` directory. This and subsequent benchmarks use GHL as a Python library; install via the following command in the top level directory:
+Generates Table III by calling iGraph, NetworkX, GraphTool and the GHL on the SI dataset. These runs are also long-running, we have therefore included our results in the `results\` directory. This and subsequent benchmarks use GHL as a Python library; install via the following command in the top level directory:
 ```
 pip install -e .
 ```

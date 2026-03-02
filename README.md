@@ -10,8 +10,6 @@ Is a standalone C++ header-only generic graph library built upon the Boost Graph
 
 > The primary feature of the GHL is to provide a robust environment for developing and applying graph transformations or isomorphisms. These isomorphisms can either be contingent on the properties of the graph, such as the edge in or out degree of vertices, or con the subclassed properties of the vertex, such as class type or the value of a class member.
 
-## Note for ICSA reviewers
-Thank-you for taking the time to review our work. You will find the code necessary to replicate the results of our submission in the ICSA directory.
 
 ## Authors
 The GHL was developed with Corey Lammie, Hadjer Benmeziane, Tunaberk Almaci, and William Simon, as the initial core authors.
