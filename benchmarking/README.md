@@ -27,7 +27,7 @@ GraphTool is not available via pip; a conda environment is recommended.
 Benchmarks comparing the BGL VF2 implementation and the GHL VF3 implementation. Compile GHL (from the project root):
 ```
 mkdir build && cd build
-cmake .. -DGHL_SERIALIZATION=ON -DGHL_BINDINGS=ON -DCMAKE_INSTALL_PREFIX:PATH=install
+cmake .. -DGHL_SERIALIZATION=ON -DGHL_BINDINGS=ON -DBENCHMARKING=ON -DCMAKE_INSTALL_PREFIX:PATH=install
 cmake --build . --target install
 ```
 Note the dependencies described in the top level README.
@@ -35,10 +35,8 @@ Note the dependencies described in the top level README.
 This copies the `vf3_vs_vf2` program to `vf2_vf3/`. Run `run_vf3_vf2_profile.sh` to generate results. `stride` and `start_index` can be used to parallelize the benchmarks across compute nodes if operating in such an environment, otherwise, leaving them unset runs all tests serially. Full benchmarks are long-running (each data point up to 5 minutes; VF2 failed on 696 tests in our experiments, leading to a minimum serialized runtime of 58 hours). Calculated results are included in `vf2_vf3/results/`. Use `report_results.py` to generate Tables I and II and Figure 3.
 
 ## isomorphisms
-Generates Table III by calling iGraph, NetworkX, GraphTool and the GHL on the SI dataset. These runs are also long-running, we have therefore included our results in the `results\` directory. This and subsequent benchmarks use GHL as a Python library; install via the following command in the top level directory:
-```
-pip install -e .
-```
+Generates Table III by calling iGraph, NetworkX, GraphTool and the GHL on the SI dataset. These runs are also long-running, we have therefore included our results in the `results\` directory. This and subsequent benchmarks use GHL as a Python library, which can be installed as described in the top-level directory.
+
 
 Use `generate_analysis.ipynb` to produce Table III once results are available.
 

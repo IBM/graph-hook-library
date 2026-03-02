@@ -32,11 +32,9 @@ The GHL can be setup/installed in two different ways:
 
 `pip install git+https://github.com/IBM/graph-hook-library.git` -->
 
-Until open-sourced, the GHL can be installed by calling
+GHL will be made available on PyPI upon publication. It can currently be installed via the command:
 
-`pip install -e .`
-
-from the top-level directory.
+`pip install git+ssh://git@github.com/IBM/graph-hook-library`
 
 It can then be used as follows:
 
