@@ -1,4 +1,4 @@
-# Copyright (c) 2025 IBM
+# Copyright (c) 2026 IBM
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -39,6 +39,7 @@ endif()
 option(DO_DEBUG "Enabling debug mode" OFF)
 option(GHL_SERIALIZATION "Build serialization code" OFF)
 option(GHL_BINDINGS "Build python bindings" ON)
+option(BENCHMARKING "Build benchmarking code" OFF)
 
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR AND NOT DEFINED PY_BUILD_CMAKE_IMPORT_NAME)
   set(GHL_MASTER_PROJECT ON)
@@ -249,8 +250,9 @@ endif()
 if(GHL_MASTER_PROJECT)
   add_subdirectory(tests/cpp)
   add_subdirectory(examples/cpp)
-  add_subdirectory(benchmarking/vf2_vf3)
-
+  if(BENCHMARKING)
+    add_subdirectory(benchmarking/vf2_vf3)
+  endif()
   if(GHL_BINDINGS)
     add_custom_command(
       TARGET ghl_bindings POST_BUILD
