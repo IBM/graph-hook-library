@@ -66,7 +66,7 @@ namespace ghl {
  * proper inheritance and extension.
  */
 class PYBIND11_EXPORT BaseNode {
-  int id_ = INT_MIN; //< Unique identifier for the node
+  int id_ = INT_MIN; ///< Unique identifier for the node
 #ifdef GHL_SERIALIZATION
   friend class cereal::access;
   template <class Archive> void serialize(Archive &ar);

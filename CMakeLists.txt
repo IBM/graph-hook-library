@@ -1,4 +1,4 @@
-# Copyright (c) 2025 IBM
+# Copyright (c) 2026 IBM
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -39,12 +39,14 @@ endif()
 option(DO_DEBUG "Enabling debug mode" OFF)
 option(GHL_SERIALIZATION "Build serialization code" OFF)
 option(GHL_BINDINGS "Build python bindings" ON)
+option(BENCHMARKING "Build benchmarking code" OFF)
 
-if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR AND NOT DEFINED PY_BUILD_CMAKE_IMPORT_NAME)
   set(GHL_MASTER_PROJECT ON)
 else()
   set(GHL_MASTER_PROJECT OFF)
 endif()
+message(STATUS "GHL_MASTER_PROJECT ${GHL_MASTER_PROJECT}")
 
 if(DO_DEBUG)
   add_definitions(-DDO_DEBUG)
@@ -211,34 +213,17 @@ endif()
 
 if(GHL_BINDINGS)
   find_package(Python3 COMPONENTS Interpreter Development)
+  find_package(pybind11 CONFIG REQUIRED HINTS "${Python3_SITELIB}")
   include_directories(${Python3_INCLUDE_DIRS})
   find_library(pybind11_lib pybind11::lto)
 
-  if(NOT TARGET pybind11_headers)
-    CPMAddPackage(
-      NAME pybind11
-      GIT_REPOSITORY https://github.com/pybind/pybind11.git
-      VERSION 2.13.6
-      DOWNLOAD_ONLY
-    )
-    message(${pybind11_SOURCE_DIR})
-    target_include_directories(ghl PUBLIC "${pybind11_SOURCE_DIR}/include")
-  else()
-    # I suspect this won't always work as its not guaranteed the
-    # pybind11/include files will be linked to ghl
-    message("Found previous target pybind11")
-  endif()
-
   pybind11_add_module(ghl_bindings include/ghl/bindings/graph_bindings.cpp)
-  target_sources(ghl PUBLIC "${CMAKE_CURRENT_LIST_DIR}/include/ghl/bindings/graph_bindings.cpp")
 
   foreach(boost_lib ${BOOST_INCLUDE_LIBRARIES})
     if(TARGET Boost::${boost_lib})
       target_link_libraries(ghl_bindings PRIVATE Boost::${boost_lib})
     endif()
   endforeach()
-
-  target_link_libraries(ghl_bindings PRIVATE ghl)
 
   if(APPLE)
     set_target_properties(ghl_bindings PROPERTIES LINK_FLAGS "-undefined dynamic_lookup" SUFFIX ".so")
@@ -248,6 +233,7 @@ if(GHL_BINDINGS)
 
   if(GHL_SERIALIZATION)
     target_sources(ghl PUBLIC "${CMAKE_CURRENT_LIST_DIR}/include/ghl/cereal/pybind11.cpp")
+    target_include_directories(ghl PUBLIC "${pybind11_INCLUDE_DIR}")
 
     foreach(a_lib ${BOOST_INCLUDE_LIBRARIES})
       target_link_libraries(ghl PRIVATE Boost::${a_lib})
@@ -263,8 +249,10 @@ endif()
 
 if(GHL_MASTER_PROJECT)
   add_subdirectory(tests/cpp)
-  add_subdirectory(examples)
-
+  add_subdirectory(examples/cpp)
+  if(BENCHMARKING)
+    add_subdirectory(benchmarking/vf2_vf3)
+  endif()
   if(GHL_BINDINGS)
     add_custom_command(
       TARGET ghl_bindings POST_BUILD
@@ -283,9 +271,30 @@ if(GHL_MASTER_PROJECT)
       ${CMAKE_CURRENT_BINARY_DIR}/tests
       COMMENT "Copying tests directory..."
     )
-    if(DEFINED PY_BUILD_CMAKE_IMPORT_NAME)
-      install(TARGETS ghl_bindings
-            DESTINATION "${PY_BUILD_CMAKE_IMPORT_NAME}")
-    endif()
   endif()
+endif()
+if(DEFINED PY_BUILD_CMAKE_IMPORT_NAME)
+  install(TARGETS ghl_bindings
+    DESTINATION "${PY_BUILD_CMAKE_IMPORT_NAME}")
+  get_target_property(BOOST_INCLUDE_DIRS boost_graph INTERFACE_INCLUDE_DIRECTORIES)
+  message(STATUS "Boost include dirs: ${BOOST_INCLUDE_DIRS}")
+  install(DIRECTORY
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/ghl"
+    DESTINATION "${PY_BUILD_CMAKE_IMPORT_NAME}/include")
+
+  foreach(boost_dir ${BOOST_LIBRARY_INCLUDES})
+    message(STATUS "Installing Boost headers from: ${boost_dir}")
+    install(
+      DIRECTORY "${boost_dir}"
+      DESTINATION "${PY_BUILD_CMAKE_IMPORT_NAME}"
+      FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp" PATTERN "*.ipp"
+    )
+  endforeach()
+  # Folder structure exception to BOOST_LIBRARY_INCLUDES
+  install(
+    DIRECTORY "${boost_numeric_conversion_SOURCE_DIR}/include"
+    DESTINATION "${PY_BUILD_CMAKE_IMPORT_NAME}"
+    FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp" PATTERN "*.ipp"
+  )
+
 endif()

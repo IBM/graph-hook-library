@@ -23,55 +23,54 @@
 #include <ghl/ghl.h>
 #include <ghl/ghl_isomorphisms.h>
 
-using ImplementedIsomorphism = ghl::Isomorphism<VertexProperty, EdgeProperty>;
+using ImplementedIsomorphism = ghl::DirectedIsomorphism<VertexProperty, EdgeProperty>;
 
 /**
  * @brief Creates a sample map graph of cities and connecting
  * roads.
  *
- * @return MapGraphType A graph containing the cities and their connecting roads
+ * @return MapGraph A graph containing the cities and their connecting roads
  */
-MapGraphType make_map() {
+std::shared_ptr<MapGraph> make_map() {
   // Initialize empty map graph
-  auto map = MapGraphType();
-  std::vector<MapGraphType::TemplatedVertex> city_vertices;
+  auto map = std::make_shared<MapGraph>();
+  std::vector<MapGraph::VertexDescriptor> city_vertices;
 
   // Add vertices (cities) with properties
-  city_vertices.push_back(map.add_vertex(std::make_shared<City>("A", 6)));
-  city_vertices.push_back(map.add_vertex(std::make_shared<City>("B", 7)));
-  city_vertices.push_back(map.add_vertex(std::make_shared<City>("C", 6)));
-  city_vertices.push_back(map.add_vertex(std::make_shared<City>("D", 12)));
-  city_vertices.push_back(map.add_vertex(std::make_shared<City>("E", 5)));
-  city_vertices.push_back(map.add_vertex(std::make_shared<City>("F", 9)));
+  city_vertices.push_back(map->add_vertex(std::make_shared<City>("A", 6)));
+  city_vertices.push_back(map->add_vertex(std::make_shared<City>("B", 7)));
+  city_vertices.push_back(map->add_vertex(std::make_shared<City>("C", 6)));
+  city_vertices.push_back(map->add_vertex(std::make_shared<City>("D", 12)));
+  city_vertices.push_back(map->add_vertex(std::make_shared<City>("E", 5)));
+  city_vertices.push_back(map->add_vertex(std::make_shared<City>("F", 9)));
 
   // Edges connect cities with roads with 2 lanes
-  map.add_edge(city_vertices[0], city_vertices[1], std::make_shared<Road>(2));
-  map.add_edge(city_vertices[1], city_vertices[0], std::make_shared<Road>(2));
-  map.add_edge(city_vertices[0], city_vertices[2], std::make_shared<Road>(2));
-  map.add_edge(city_vertices[2], city_vertices[0], std::make_shared<Road>(2));
-  map.add_edge(city_vertices[0], city_vertices[3], std::make_shared<Road>(2));
-  map.add_edge(city_vertices[3], city_vertices[0], std::make_shared<Road>(2));
-  map.add_edge(city_vertices[1], city_vertices[5], std::make_shared<Road>(2));
-  map.add_edge(city_vertices[5], city_vertices[1], std::make_shared<Road>(2));
-  map.add_edge(city_vertices[1], city_vertices[2], std::make_shared<Road>(2));
-  map.add_edge(city_vertices[2], city_vertices[1], std::make_shared<Road>(2));
-  map.add_edge(city_vertices[1], city_vertices[3], std::make_shared<Road>(2));
-  map.add_edge(city_vertices[3], city_vertices[1], std::make_shared<Road>(2));
-  map.add_edge(city_vertices[1], city_vertices[4], std::make_shared<Road>(2));
-  map.add_edge(city_vertices[4], city_vertices[1], std::make_shared<Road>(2));
-  map.add_edge(city_vertices[2], city_vertices[5], std::make_shared<Road>(2));
-  map.add_edge(city_vertices[5], city_vertices[2], std::make_shared<Road>(2));
+  map->add_edge(city_vertices[0], city_vertices[1], std::make_shared<Road>(2));
+  map->add_edge(city_vertices[1], city_vertices[0], std::make_shared<Road>(2));
+  map->add_edge(city_vertices[0], city_vertices[2], std::make_shared<Road>(2));
+  map->add_edge(city_vertices[2], city_vertices[0], std::make_shared<Road>(2));
+  map->add_edge(city_vertices[0], city_vertices[3], std::make_shared<Road>(2));
+  map->add_edge(city_vertices[3], city_vertices[0], std::make_shared<Road>(2));
+  map->add_edge(city_vertices[1], city_vertices[5], std::make_shared<Road>(2));
+  map->add_edge(city_vertices[5], city_vertices[1], std::make_shared<Road>(2));
+  map->add_edge(city_vertices[1], city_vertices[2], std::make_shared<Road>(2));
+  map->add_edge(city_vertices[2], city_vertices[1], std::make_shared<Road>(2));
+  map->add_edge(city_vertices[1], city_vertices[3], std::make_shared<Road>(2));
+  map->add_edge(city_vertices[3], city_vertices[1], std::make_shared<Road>(2));
+  map->add_edge(city_vertices[1], city_vertices[4], std::make_shared<Road>(2));
+  map->add_edge(city_vertices[4], city_vertices[1], std::make_shared<Road>(2));
+  map->add_edge(city_vertices[2], city_vertices[5], std::make_shared<Road>(2));
+  map->add_edge(city_vertices[5], city_vertices[2], std::make_shared<Road>(2));
 
   return map;
 }
-
 
 /**
  * @brief Creates the pattern graph to match for isomorphism
  * @return A GHL graph with the topoplogy to be matched
  */
-ghl::Graph<VertexProperty, EdgeProperty> create_isomorphism_graph() {
-  auto isomorphism_graph = ghl::Graph<VertexProperty, EdgeProperty>();
+ghl::DirectedGraph<VertexProperty, EdgeProperty> create_isomorphism_graph() {
+  auto isomorphism_graph = ghl::DirectedGraph<VertexProperty, EdgeProperty>();
   b::add_vertex(std::make_shared<City>("any", 0, false), isomorphism_graph);
   b::add_vertex(std::make_shared<City>("any", 0, false), isomorphism_graph);
   b::add_vertex(std::make_shared<City>("any", 0, false), isomorphism_graph);
@@ -99,7 +98,7 @@ public:
    * @brief Constructs the isomorphism with a pattern graph.
    * @param iso_graph Graph pattern to match for transformation
    */
-  explicit InsertHub(const MapGraphType::GraphType &iso_graph) : ImplementedIsomorphism(iso_graph) {};
+  explicit InsertHub(const MapGraph::GraphType &iso_graph) : ImplementedIsomorphism(iso_graph) {};
 
   /**
    * @brief Defines vertex matching criteria for a detected isomorphism
@@ -108,8 +107,8 @@ public:
    * @return Function implementing vertex comparison logic
    */
   VertexCompFunction vertex_comp_function() final {
-    return [](const GraphType &iso_graph, const GraphType &target_graph, const TemplatedVertex iso_vertex,
-              const TemplatedVertex target_vertex) {
+    return [](const GraphType &iso_graph, const GraphType &target_graph, const VertexDescriptor iso_vertex,
+              const VertexDescriptor target_vertex) {
       auto target_city = std::dynamic_pointer_cast<City>(target_graph[target_vertex]);
       return target_city && target_city->population() < 8;
     };
@@ -120,7 +119,7 @@ public:
    * @return Function implementing edge comparison logic
    */
   EdgeCompFunction edge_comp_function() final {
-    return [](const GraphType &, const GraphType &, const TemplatedEdge, const TemplatedEdge) { return true; };
+    return [](const GraphType &, const GraphType &, const EdgeDescriptor, const EdgeDescriptor) { return true; };
   }
 
   /**
@@ -135,7 +134,7 @@ public:
    */
   IsoMap specialize_isomorphism(const GraphType &graph, const IsoMap &isomorphism) final {
     IsoMap ret_iso = isomorphism;
-    TemplatedVertex iso_vertex = isomorphism.size();
+    VertexDescriptor iso_vertex = isomorphism.size();
 
     for (int i = 0; i < isomorphism.size(); i++) {
       for (auto edge : b::make_iterator_range(b::in_edges(isomorphism.at(i)[0], graph))) {
@@ -211,7 +210,7 @@ public:
       if (!city) // then it is a hub
         continue;
       if (city->population() <= 5) { // need to restore its edge
-        for (TemplatedEdge edge : b::make_iterator_range(b::edges(input_graph))) {
+        for (EdgeDescriptor edge : b::make_iterator_range(b::edges(input_graph))) {
           auto src = b::source(edge, input_graph);
           if (src == iso_vertex) {
             auto trg = b::target(edge, input_graph);
@@ -232,22 +231,22 @@ public:
    * transformation.
    *
    * Controls how edges connecting to non-transformed vertices are handled:
-   * - If a non-transformed vertex (city) has population > 10, it is 
+   * - If a non-transformed vertex (city) has population > 10, it is
    * also connected to the hub and loses its other road connections.
    * - If a non-transformed vertex (city) has population <= 10, it preserves
-   * its road connections and is not connected to the hub. 
+   * its road connections and is not connected to the hub.
    *
    * @return Function implementing edge reconstruction logic
    */
   ReconstructEdgesFunction reconstruct_edges_function() final {
     return [](const std::vector<TemplatedEdgeReplacementStruct> &external_incoming_edges,
               const std::vector<TemplatedEdgeReplacementStruct> &external_outgoing_edges,
-              const std::vector<TemplatedVertex> &, const std::vector<TemplatedVertex> &, GraphType &graph) {
+              const std::vector<VertexDescriptor> &, const std::vector<VertexDescriptor> &, GraphType &graph) {
       std::cout << "Reconstructing edges to the isomorphism..." << std::endl;
 
       // Detect the hub
-      TemplatedVertex hub_vertex;
-      for (TemplatedVertex vertex : b::make_iterator_range(b::vertices(graph))) {
+      VertexDescriptor hub_vertex;
+      for (VertexDescriptor vertex : b::make_iterator_range(b::vertices(graph))) {
         auto hub = std::dynamic_pointer_cast<HUB>(graph[vertex]);
         if (hub) {
           hub_vertex = vertex;
@@ -311,10 +310,10 @@ int main(int argc, char *argv[]) {
   auto isomorphism = std::make_shared<InsertHub>(isomorphism_graph);
   std::cout << "Isomorphism created" << std::endl;
 
-  MapGraphType map = make_map();
-  map.write_graph("output/cities_no_hub");
-  ghl::apply_isomorphism<VertexProperty, EdgeProperty>(map, isomorphism, true, true);
-  map.write_graph("output/cities_inserted_hub");
+  std::shared_ptr<MapGraph> map = make_map();
+  map->write_graph("output/cities_no_hub");
+  ghl::apply_isomorphism(map, isomorphism, true, true);
+  map->write_graph("output/cities_inserted_hub");
 
   return 0;
 }

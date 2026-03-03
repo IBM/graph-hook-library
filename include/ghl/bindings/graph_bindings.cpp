@@ -36,19 +36,47 @@ void ghl::primitive_edge_bindings(const py::module_ &m) {
 
 void ghl::graph_bindings(py::module_ &m) {
   py::class_<b::no_property>(m, "boost::no_property").def(py::init<>());
-  py::class_<EdgeDescImpl>(m, "EdgeDescImpl")
+  py::class_<DirectedEdgeDescImpl>(m, "DirectedEdgeDescImpl")
       .def(py::init<>())
-      .def_readwrite("m_source", &EdgeDescImpl::m_source)
-      .def_readwrite("m_target", &EdgeDescImpl::m_target)
-      .def("__repr__", [](const EdgeDescImpl &e) {
+      .def_readwrite("m_source", &DirectedEdgeDescImpl::m_source)
+      .def_readwrite("m_target", &DirectedEdgeDescImpl::m_target)
+      .def("__repr__", [](const DirectedEdgeDescImpl &e) {
         return std::format("<EdgeDescImpl source={} target={}>", std::to_string(e.m_source),
                            std::to_string(e.m_target));
       });
-  declare_graph_bindings<std::shared_ptr<ghl::BaseNode>, std::shared_ptr<ghl::PrimitiveEdge>>(m, "Graph");
+  py::class_<UndirectedEdgeDescImpl>(m, "EdgeDescImpl")
+      .def(py::init<>())
+      .def_readwrite("m_source", &UndirectedEdgeDescImpl::m_source)
+      .def_readwrite("m_target", &UndirectedEdgeDescImpl::m_target)
+      .def("__repr__", [](const UndirectedEdgeDescImpl &e) {
+        return std::format("<EdgeDescImpl node0={} node1={}>", std::to_string(e.m_source), std::to_string(e.m_target));
+      });
+  declare_graph_bindings<ghl::DirectedGraph<std::shared_ptr<ghl::BaseNode>, std::shared_ptr<ghl::PrimitiveEdge>>>(
+      m, "DirectedGraph");
+  declare_graph_bindings<ghl::UndirectedGraph<std::shared_ptr<ghl::BaseNode>, std::shared_ptr<ghl::PrimitiveEdge>>>(
+      m, "UndirectedGraph");
+  declare_extended_graph_bindings<
+      ghl::DirectedExtendedGraph<std::shared_ptr<ghl::BaseNode>, std::shared_ptr<ghl::PrimitiveEdge>>>(
+      m, "DirectedExtendedGraph");
+  declare_extended_graph_bindings<
+      ghl::UndirectedExtendedGraph<std::shared_ptr<ghl::BaseNode>, std::shared_ptr<ghl::PrimitiveEdge>>>(
+      m, "UndirectedExtendedGraph");
 }
 
 void ghl::isomorphism_bindings(py::module_ &m) {
-  declare_isomorphism_bindings<std::shared_ptr<ghl::BaseNode>, std::shared_ptr<ghl::PrimitiveEdge>>(m, "Isomorphism");
+  declare_isomorphism_bindings<
+      DirectedIsomorphism<std::shared_ptr<ghl::BaseNode>, std::shared_ptr<ghl::PrimitiveEdge>>>(m,
+                                                                                                "DirectedIsomorphism");
+  declare_isomorphism_bindings<
+      UndirectedIsomorphism<std::shared_ptr<ghl::BaseNode>, std::shared_ptr<ghl::PrimitiveEdge>>>(
+      m, "UndirectedIsomorphism");
+}
+
+void ghl::register_base_types(py::module_ &m) {
+  ghl::base_node_bindings(m);
+  ghl::primitive_edge_bindings(m);
+  ghl::graph_bindings(m);
+  ghl::isomorphism_bindings(m);
 }
 
 /**
@@ -60,8 +88,5 @@ void ghl::isomorphism_bindings(py::module_ &m) {
  */
 PYBIND11_MODULE(ghl_bindings, m) {
   m.doc() = "Pybind11 bindings that expose the GHL to python.";
-  ghl::base_node_bindings(m);
-  ghl::primitive_edge_bindings(m);
-  ghl::graph_bindings(m);
-  ghl::isomorphism_bindings(m);
+  ghl::register_base_types(m);
 }

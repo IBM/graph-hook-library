@@ -42,6 +42,7 @@
 // Try to keep this file out of other h files where possible, as it pulls in the
 // pybind11 library.
 #include "../graph/graph.h"
+#include "../isomorphism/apply_isomorphism.h"
 #include "../isomorphism/graph_isomorphisms.h"
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
@@ -59,96 +60,23 @@ namespace ghl {
  * Outputs all vertices and edges in the graph for debugging and visualization
  * purposes.
  *
- * @tparam VertexProperties Type of vertex properties
- * @tparam EdgeProperties Type of edge properties
+ * @tparam GraphT Boost graph type exposing vertex/edge iterators and descriptors.
  * @param graph The graph to print
  */
-template <typename VertexProperties, typename EdgeProperties = b::no_property>
-void print_graph(const Graph<VertexProperties, EdgeProperties> &graph) {
+template <typename GraphT> void print_graph(const GraphT &graph) {
   std::cout << "Vertices:" << std::endl;
-  for (Vertex<VertexProperties, EdgeProperties> vertex : b::make_iterator_range(b::vertices(graph))) {
+  for (auto vertex : b::make_iterator_range(b::vertices(graph))) {
     std::cout << vertex << std::endl;
   }
   std::cout << "Edges:" << std::endl;
-  for (Edge<VertexProperties, EdgeProperties> edge : b::make_iterator_range(b::edges(graph))) {
+  for (auto edge : b::make_iterator_range(b::edges(graph))) {
     std::cout << source(edge, graph) << " -> " << target(edge, graph) << std::endl;
   }
 }
 
-/**
- * @brief Returns a vector of all vertices in the graph.
- *
- * @tparam VertexProperties Type of vertex properties
- * @tparam EdgeProperties Type of edge properties
- * @param graph The graph to extract vertices from
- * @return Vector containing all vertex descriptors
- */
-template <typename VertexProperties, typename EdgeProperties = b::no_property>
-std::vector<Vertex<VertexProperties, EdgeProperties>> vertices_(Graph<VertexProperties, EdgeProperties> graph) {
-  std::vector<Vertex<VertexProperties, EdgeProperties>> vertex_vector;
-  for (Vertex<VertexProperties, EdgeProperties> vertex : b::make_iterator_range(b::vertices(graph))) {
-    vertex_vector.push_back(vertex);
-  }
-  return vertex_vector;
-}
-
-/**
- * @brief Returns a vector of all edges in the graph.
- *
- * @tparam VertexProperties Type of vertex properties
- * @tparam EdgeProperties Type of edge properties
- * @param graph The graph to extract edges from
- * @return Vector containing all edge descriptors
- */
-template <typename VertexProperties, typename EdgeProperties = b::no_property>
-std::vector<Edge<VertexProperties, EdgeProperties>> edges_(Graph<VertexProperties, EdgeProperties> graph) {
-  std::vector<Edge<VertexProperties, EdgeProperties>> edge_vector;
-  for (Edge<VertexProperties, EdgeProperties> edge : b::make_iterator_range(b::edges(graph))) {
-    edge_vector.push_back(edge);
-  }
-  return edge_vector;
-}
-
-/**
- * @brief Returns a vector of all incoming edges for a vertex.
- *
- * @tparam VertexProperties Type of vertex properties
- * @tparam EdgeProperties Type of edge properties
- * @param graph The graph containing the vertex
- * @param vertex The vertex to get incoming edges for
- * @return Vector of incoming edge descriptors
- */
-template <typename VertexProperties, typename EdgeProperties = b::no_property>
-std::vector<Edge<VertexProperties, EdgeProperties>> in_edges(Graph<VertexProperties, EdgeProperties> graph,
-                                                             Vertex<VertexProperties, EdgeProperties> vertex) {
-  std::vector<Edge<VertexProperties, EdgeProperties>> edge_vector;
-  for (Edge<VertexProperties, EdgeProperties> edge : b::make_iterator_range(b::in_edges(vertex, graph))) {
-    edge_vector.push_back(edge);
-  }
-  return edge_vector;
-}
-
-/**
- * @brief Returns a vector of all outgoing edges for a vertex.
- *
- * @tparam VertexProperties Type of vertex properties
- * @tparam EdgeProperties Type of edge properties
- * @param graph The graph containing the vertex
- * @param vertex The vertex to get outgoing edges for
- * @return Vector of outgoing edge descriptors
- */
-template <typename VertexProperties, typename EdgeProperties = b::no_property>
-std::vector<Edge<VertexProperties, EdgeProperties>> out_edges(Graph<VertexProperties, EdgeProperties> graph,
-                                                              Vertex<VertexProperties, EdgeProperties> vertex) {
-  std::vector<Edge<VertexProperties, EdgeProperties>> edge_vector;
-  for (Edge<VertexProperties, EdgeProperties> edge : b::make_iterator_range(b::out_edges(vertex, graph))) {
-    edge_vector.push_back(edge);
-  }
-  return edge_vector;
-}
-
 // Type alias for Boost's edge descriptor implementation
-using EdgeDescImpl = b::detail::edge_desc_impl<b::bidirectional_tag, unsigned long>;
+using DirectedEdgeDescImpl = b::detail::edge_desc_impl<b::bidirectional_tag, unsigned long>;
+using UndirectedEdgeDescImpl = b::detail::edge_desc_impl<b::undirected_tag, unsigned long>;
 
 /**
  * @brief Declares Python bindings for a graph type.
@@ -156,42 +84,114 @@ using EdgeDescImpl = b::detail::edge_desc_impl<b::bidirectional_tag, unsigned lo
  * Creates Python bindings for graph operations including vertex/edge
  * manipulation, property access, and traversal methods.
  *
- * @tparam VertexProperties Type of vertex properties
- * @tparam EdgeProperties Type of edge properties
+ * @tparam GraphT Boost graph type to expose to Python.
  * @param m The pybind11 module to add bindings to
  * @param pyclass_name Name of the Python class to create
  */
-template <typename VertexProperties, typename EdgeProperties = b::no_property>
-void declare_graph_bindings(py::module_ &m, const std::string &pyclass_name) {
-  using TemplatedGraph = Graph<VertexProperties, EdgeProperties>;
-  using TemplatedVertex = Vertex<VertexProperties, EdgeProperties>;
-  using TemplatedEdge = Edge<VertexProperties, EdgeProperties>;
-  py::class_<TemplatedGraph>(m, pyclass_name.c_str(), py::buffer_protocol(), py::dynamic_attr())
+template <typename GraphT> void declare_graph_bindings(py::module_ &m, const std::string &pyclass_name) {
+  using VertexDescriptor = typename GraphT::vertex_descriptor;
+  using EdgeDescriptor = typename GraphT::edge_descriptor;
+  using VertexProperties = typename GraphT::vertex_property_type;
+  using EdgeProperties = typename GraphT::edge_property_type;
+  py::class_<GraphT>(m, pyclass_name.c_str(), py::buffer_protocol(), py::dynamic_attr())
       .def(py::init<>())
-      .def("in_edges", &in_edges<VertexProperties, EdgeProperties>)
-      .def("out_edges", &out_edges<VertexProperties, EdgeProperties>);
-  m.def("add_vertex",
-        [](const VertexProperties &p, TemplatedGraph &g) { return (TemplatedVertex)b::add_vertex(p, g); });
-  m.def("remove_vertex", [](TemplatedVertex u, TemplatedGraph &g) { return b::remove_vertex(u, g); });
-  m.def("add_edge", [](TemplatedVertex u, TemplatedVertex v, const EdgeProperties &p, TemplatedGraph &g) {
-    std::pair<TemplatedEdge, bool> result = b::add_edge(u, v, p, g);
+      .def("in_edges",
+           [](GraphT graph, VertexDescriptor vertex) {
+             std::vector<EdgeDescriptor> edge_vector;
+             for (auto edge : b::make_iterator_range(b::in_edges(vertex, graph))) {
+               edge_vector.push_back(edge);
+             }
+             return edge_vector;
+           })
+      .def("out_edges", [](GraphT graph, VertexDescriptor vertex) {
+        std::vector<EdgeDescriptor> edge_vector;
+        for (auto edge : b::make_iterator_range(b::out_edges(vertex, graph))) {
+          edge_vector.push_back(edge);
+        }
+        return edge_vector;
+      });
+  m.def("add_vertex", [](const VertexProperties &p, GraphT &g) { return (VertexDescriptor)b::add_vertex(p, g); });
+  m.def("remove_vertex", [](VertexDescriptor u, GraphT &g) { return b::remove_vertex(u, g); });
+  m.def("add_edge", [](VertexDescriptor u, VertexDescriptor v, const EdgeProperties &p, GraphT &g) {
+    std::pair<EdgeDescriptor, bool> result = b::add_edge(u, v, p, g);
     return result.second;
   });
-  m.def("remove_edge", [](TemplatedVertex u, TemplatedVertex v, TemplatedGraph &g) { return b::remove_edge(u, v, g); });
-  m.def("vertices", &vertices_<VertexProperties, EdgeProperties>);
-  m.def("get_vertex", [](TemplatedVertex v, TemplatedGraph &g) { return g[v]; });
-  m.def("edges", &edges_<VertexProperties, EdgeProperties>);
-  m.def("get_edge", [](TemplatedEdge e, TemplatedGraph &g) { return g[e]; });
-  m.def("source", [](TemplatedEdge e, TemplatedGraph &g) { return b::source(e, g); });
-  m.def("target", [](TemplatedEdge e, TemplatedGraph &g) { return b::target(e, g); });
-  m.def("print_graph", &print_graph<VertexProperties, EdgeProperties>);
+  m.def("remove_edge", [](VertexDescriptor u, VertexDescriptor v, GraphT &g) { return b::remove_edge(u, v, g); });
+  m.def("vertices", [](GraphT graph) {
+    std::vector<VertexDescriptor> vertex_vector;
+    for (auto vertex : b::make_iterator_range(b::vertices(graph))) {
+      vertex_vector.push_back(vertex);
+    }
+    return vertex_vector;
+  });
+  m.def("get_vertex", [](VertexDescriptor v, GraphT &g) { return g[v]; });
+  m.def("edges", [](GraphT graph) {
+    std::vector<EdgeDescriptor> edge_vector;
+    for (auto edge : b::make_iterator_range(b::edges(graph))) {
+      edge_vector.push_back(edge);
+    }
+    return edge_vector;
+  });
+  m.def("get_edge", [](EdgeDescriptor e, GraphT &g) { return g[e]; });
+  m.def("source", [](EdgeDescriptor e, GraphT &g) { return b::source(e, g); });
+  m.def("target", [](EdgeDescriptor e, GraphT &g) { return b::target(e, g); });
+  m.def("print_graph", &print_graph<GraphT>);
 }
 
-template <typename VertexProperties, typename EdgeProperties = b::no_property>
-void declare_generic_edge_descriptor(py::module_ &m, const std::string &pyclass_name) {
-  using TemplatedEdgeDescriptor = generic_edge_descriptor<VertexProperties, EdgeProperties>;
-  py::class_<TemplatedEdgeDescriptor>(m, pyclass_name.c_str(), py::buffer_protocol(), py::dynamic_attr())
-      .def(py::init<VertexProperties, VertexProperties, EdgeProperties>());
+/**
+ * @brief Declares Python bindings for an ExtendedGraph wrapper.
+ *
+ * @tparam ExtendedGraphT The extended graph wrapper type.
+ * @param m The pybind11 module to add bindings to.
+ * @param pyclass_name Name of the Python class to create.
+ */
+template <typename ExtendedGraphT>
+void declare_extended_graph_bindings(py::module_ &m, const std::string &pyclass_name) {
+  using EdgeDescriptor = typename ExtendedGraphT::EdgeDescriptor;
+  using VertexDescriptor = typename ExtendedGraphT::VertexDescriptor;
+  using GraphType = typename ExtendedGraphT::GraphType;
+  using VertexProperties = typename GraphType::vertex_property_type;
+  using EdgeProperties = typename GraphType::edge_property_type;
+
+  py::class_<ExtendedGraphT, std::shared_ptr<ExtendedGraphT>>(m, pyclass_name.c_str(), py::buffer_protocol(),
+                                                              py::dynamic_attr())
+      .def(py::init<>())
+      .def("add_vertex", &ExtendedGraphT::add_vertex)
+      .def("add_edge", &ExtendedGraphT::add_edge)
+      .def(
+          "__getitem__", [](ExtendedGraphT &self, VertexDescriptor v) -> VertexProperties & { return self.graph()[v]; },
+          py::return_value_policy::reference_internal)
+      .def(
+          "__getitem__", [](ExtendedGraphT &self, EdgeDescriptor e) -> EdgeProperties & { return self.graph()[e]; },
+          py::return_value_policy::reference_internal)
+      .def(
+          "get_vertex", [](ExtendedGraphT &self, VertexDescriptor v) -> VertexProperties & { return self.graph()[v]; },
+          py::return_value_policy::reference_internal)
+      .def(
+          "get_edge", [](ExtendedGraphT &self, EdgeDescriptor e) -> EdgeProperties & { return self.graph()[e]; },
+          py::return_value_policy::reference_internal)
+      .def("edge_source", &ExtendedGraphT::edge_source)
+      .def("edge_target", &ExtendedGraphT::edge_target)
+      .def("vertices",
+           [](ExtendedGraphT &self) {
+             std::vector<VertexDescriptor> verts;
+             for (auto v : self.vertex_range()) {
+               verts.push_back(v);
+             }
+             return verts;
+           })
+      .def("edges",
+           [](ExtendedGraphT &self) {
+             std::vector<EdgeDescriptor> edges;
+             for (auto e : self.edge_range()) {
+               edges.push_back(e);
+             }
+             return edges;
+           })
+      .def("write_graph", &ExtendedGraphT::write_graph)
+      .def("num_vertices", &ExtendedGraphT::num_vertices)
+      .def("graph", static_cast<typename ExtendedGraphT::GraphType &(ExtendedGraphT::*)()>(&ExtendedGraphT::graph),
+           py::return_value_policy::reference_internal);
 }
 
 /**
@@ -199,33 +199,34 @@ void declare_generic_edge_descriptor(py::module_ &m, const std::string &pyclass_
  *
  * Creates Python bindings for isomorphism initialization and discover function.
  *
- * @tparam VertexProperties Type of vertex properties
- * @tparam EdgeProperties Type of edge properties
+ * @tparam Isomorphism The isomorphism class to expose.
  * @param m The pybind11 module to add bindings to
  * @param pyclass_name Name of the Python class to create
  */
-template <typename VertexProperties, typename EdgeProperties = b::no_property>
-void declare_isomorphism_bindings(py::module_ &m, const std::string &pyclass_name) {
-  using Isomorphism = Isomorphism<VertexProperties, EdgeProperties>;
+template <typename Isomorphism> void declare_isomorphism_bindings(py::module_ &m, const std::string &pyclass_name) {
   using GraphType = Isomorphism::GraphType;
-  using IsoMap = Isomorphism::IsoMap;
+  using VertexProperties = Isomorphism::VertexProperties;
+  using DirectionProperty = Isomorphism::DirectionProperty;
+  using EdgeProperties = Isomorphism::EdgeProperties;
   using IsIsomorphismValidFunction = Isomorphism::IsIsomorphismValidFunction;
   using SpecializeIsoFunction = Isomorphism::SpecializeIsoFunction;
+  using GraphWrapper = ExtendedGraph<VertexProperties, DirectionProperty, EdgeProperties>;
 
-  py::class_<Isomorphism>(m, pyclass_name.c_str(), py::buffer_protocol(), py::dynamic_attr())
+  py::class_<Isomorphism, std::shared_ptr<Isomorphism>>(m, pyclass_name.c_str(), py::buffer_protocol(),
+                                                        py::dynamic_attr())
       .def(py::init<GraphType>(), py::arg("init_graph"),
            "Construct an Isomorphism instance with the given input graph.")
       .def(
           "discover",
-          [](Isomorphism &self, GraphType &sg, const GraphType &g, bool first,
-             IsIsomorphismValidFunction is_isomorphism_valid, SpecializeIsoFunction specialize_isomorphism,
-             bool nonoverlapping, bool use_vf3) {
+          [](Isomorphism &self, GraphType &sg, const GraphType &g, bool first, bool nonoverlapping, bool use_vf3,
+             IsIsomorphismValidFunction is_isomorphism_valid, SpecializeIsoFunction specialize_isomorphism) {
             return self.discover(sg, g, first, nonoverlapping, use_vf3, is_isomorphism_valid, specialize_isomorphism);
           },
           py::arg("sg"), py::arg("g"), py::arg("first") = false, py::arg("nonoverlapping") = false,
           py::arg("use_vf3") = true, py::arg("is_isomorphism_valid") = nullptr,
           py::arg("specialize_isomorphism") = nullptr,
           "Discover the isomorphisms in the graph g that match the subgraph sg.");
+  m.def("apply_isomorphism", &ghl::apply_isomorphism<GraphWrapper>);
 }
 
 /**
@@ -259,7 +260,7 @@ void graph_bindings(py::module_ &m);
  * @param m The pybind11 module to add bindings to
  */
 void isomorphism_bindings(py::module_ &m);
-
+void register_base_types(py::module_ &m);
 } // namespace ghl
 
 #endif

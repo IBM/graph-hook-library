@@ -36,13 +36,13 @@
 namespace boost = b;
 
 // Type alias for edge properties using PrimitiveEdge
-using TemplatedEdge = std::shared_ptr<ghl::PrimitiveEdge>;
+using EdgeDescriptor = std::shared_ptr<ghl::PrimitiveEdge>;
 // Type alias for vertex properties using BaseNode
-using TemplatedVertex = std::shared_ptr<ghl::BaseNode>;
+using VertexDescriptor = std::shared_ptr<ghl::BaseNode>;
 // Type alias for the main graph type being tested
-using GraphType = ghl::Graph<TemplatedVertex, TemplatedEdge>;
+using GraphType = ghl::DirectedGraph<VertexDescriptor, EdgeDescriptor>;
 // Type alias for the extended subgraph implementation
-using SubGraphType = ghl::ExtendedSubGraph<TemplatedVertex, TemplatedEdge>;
+using SubGraphType = ghl::DirectedExtendedSubGraph<VertexDescriptor, EdgeDescriptor>;
 
 /**
  * @brief Creates a basic test subgraph structure.

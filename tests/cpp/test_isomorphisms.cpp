@@ -35,13 +35,13 @@
 namespace boost = b;
 
 // Type alias for edge properties using PrimitiveEdge
-using TemplatedEdge = std::shared_ptr<ghl::PrimitiveEdge>;
+using EdgeDescriptor = std::shared_ptr<ghl::PrimitiveEdge>;
 // Type alias for vertex properties using BaseNode
-using TemplatedVertex = std::shared_ptr<ghl::BaseNode>;
+using VertexDescriptor = std::shared_ptr<ghl::BaseNode>;
 // Type alias for the main graph type being tested
-using GraphType = ghl::Graph<TemplatedVertex, TemplatedEdge>;
+using GraphType = ghl::DirectedGraph<VertexDescriptor, EdgeDescriptor>;
 // Type alias for the base isomorphism implementation
-using ImplementedIsomorphism = ghl::Isomorphism<TemplatedVertex, TemplatedEdge>;
+using ImplementedIsomorphism = ghl::DirectedIsomorphism<VertexDescriptor, EdgeDescriptor>;
 
 /**
  * @class Vertex
@@ -94,7 +94,7 @@ public:
    * @return Function implementing vertex comparison logic
    */
   VertexCompFunction vertex_comp_function() final {
-    return [this](const GraphType &, const GraphType &g2, const TemplatedVertex, const TemplatedVertex v2) {
+    return [this](const GraphType &, const GraphType &g2, const VertexDescriptor, const VertexDescriptor v2) {
       if (auto v = std::dynamic_pointer_cast<ghl::BaseNode>(g2[v2])) {
         bool debugme = v->id() == this->id;
         return v->id() == this->id;
@@ -108,7 +108,7 @@ public:
    * @return Function implementing edge comparison logic
    */
   EdgeCompFunction edge_comp_function() final {
-    return [](const GraphType &, const GraphType &, const TemplatedEdge, const TemplatedEdge) { return true; };
+    return [](const GraphType &, const GraphType &, const EdgeDescriptor, const EdgeDescriptor) { return true; };
   }
 
   /**
@@ -168,12 +168,12 @@ TEST(Isomorphisms, InsertVertexAfterID) {
   b::add_vertex(v2, graph);
   auto edge = std::make_shared<ghl::PrimitiveEdge>(2);
   b::add_edge(0, 1, edge, graph);
-  auto extended_graph = ghl::ExtendedGraph(graph);
+  auto extended_graph = std::make_shared<ghl::DirectedExtendedGraph<VertexDescriptor, EdgeDescriptor>>(graph);
   auto isomorphism_graph = GraphType();
   auto v3 = std::make_shared<ghl::BaseNode>(-1);
   b::add_vertex(v3, isomorphism_graph);
   auto isomorphism = std::make_shared<InsertVertexAfterVertexID>(isomorphism_graph, 0);
-  extended_graph = ghl::ExtendedGraph(graph);
-  ghl::apply_isomorphism<TemplatedVertex, TemplatedEdge>(extended_graph, isomorphism);
-  ASSERT_EQ(3, b::num_vertices(extended_graph.graph()));
+  extended_graph = std::make_shared<ghl::DirectedExtendedGraph<VertexDescriptor, EdgeDescriptor>>(graph);
+  ghl::apply_isomorphism(extended_graph, isomorphism);
+  ASSERT_EQ(3, b::num_vertices(extended_graph->graph()));
 }

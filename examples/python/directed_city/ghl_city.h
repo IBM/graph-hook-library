@@ -19,71 +19,191 @@
 // SOFTWARE.
 
 /**
- * @file 02_isomorphism.cpp
+ * @file city.h
  *
- * @brief Example demonstrating graph isomorphism and transformation
- * capabilities.
+ * @brief Defines city and road classes for graph-based map examples.
  *
- * This example showcases:
- * - Creating a graph representing Italian cities and their connections
- * - Implementing a custom isomorphism class to transform the graph
- * - Using property-based pattern matching for vertices
- * - Applying graph transformations based on discovered patterns
- * - Reconnecting incoming and outgoing edges dependent on vertex properties
+ * This file contains two classes that demonstrate custom vertex and edge
+ * property implementations in the GHL:
+ * - City: A vertex property class representing urban centers
+ * - Road: An edge property class representing connections between cities
  *
- * The example creates a graph where all roads lead to Rome, then transforms it
- * using an isomorphism that redirects roads away from Rome.
+ * These classes are used in examples to show how to create domain-specific
+ * graph structures using the GHL's extension mechanisms. They demonstrate
+ * proper inheritance from BaseNode and PrimitiveEdge respectively.
  */
 
-#include "city.h"
-#include "map_graph.h"
+#ifndef EXAMPLES_CITY_H
+#define EXAMPLES_CITY_H
+
+#include <format>
 #include <ghl/ghl.h>
 #include <ghl/ghl_isomorphisms.h>
 
-using ImplementedIsomorphism = ghl::Isomorphism<VertexProperty, EdgeProperty>;
+// namespace b = boost;
 
 /**
- * @brief Creates a sample map graph of Italian cities and their connecting
- * roads.
+ * @class City
+ * @brief Represents a city as a vertex property in a map graph.
  *
- * Constructs a graph with several European cities (Rome, Florence, Naples,
- * etc.) connected by roads. Most cities have roads leading to Rome, except
- * Paris and Marseilles which are connected to each other.
+ * This class extends BaseNode to represent cities in a map graph. Each city
+ * has properties including:
+ * - Name
+ * - Presence of a post office
+ * - Population
  *
- * @return MapGraphType A graph containing the cities and their connecting roads
+ * Used in examples to demonstrate custom vertex properties and graph
+ * visualization. See examples/01_graph.cpp and examples/02_isomorphism.cpp
+ * and examples/04_insert_hub.cpp for usage examples.
  */
-MapGraphType make_map() {
-  // Initialize empty map graph
-  auto map = MapGraphType();
-  std::vector<MapGraphType::TemplatedVertex> city_vertices;
+class City : public ghl::BaseNode {
+  std::string name_;     //< Name of the city
+  int population_;       //< Population of the city
+  bool has_post_office_; //< Whether the city has a post office
 
-  // Add vertices (cities) with properties
-  city_vertices.push_back(map.add_vertex(std::make_shared<City>("Rome")));
-  city_vertices.push_back(map.add_vertex(std::make_shared<City>("Florence")));
-  city_vertices.push_back(map.add_vertex(std::make_shared<City>("Naples", 1000)));
-  city_vertices.push_back(map.add_vertex(std::make_shared<City>("Venice")));
-  city_vertices.push_back(map.add_vertex(std::make_shared<City>("Milan", 1000)));
+public:
+  /**
+   * @brief Constructs a City with specified properties.
+   *
+   * @param name Name of the city
+   * @param has_post_office Whether the city has a post office (default: true)
+   * @param population Population of the city (default: 100)
+   */
+  explicit City(const std::string &name, int population = 100, bool has_post_office = true)
+      : name_(name), population_(population), has_post_office_(has_post_office) {}
 
-  city_vertices.push_back(map.add_vertex(std::make_shared<City>("Paris")));
-  city_vertices.push_back(map.add_vertex(std::make_shared<City>("Marsailles")));
-  city_vertices.push_back(map.add_vertex(std::make_shared<City>("Lyon", 1000)));
-  city_vertices.push_back(map.add_vertex(std::make_shared<City>("Stuttgart")));
-  city_vertices.push_back(map.add_vertex(std::make_shared<City>("Dijon", 1000)));
+  /**
+   * @brief Creates a clone of the city.
+   *
+   * @return std::shared_ptr<BaseNode> Smart pointer to a new City instance
+   *         with the same properties
+   */
+  std::shared_ptr<BaseNode> clone() final { return std::make_shared<City>(name_, population_, has_post_office_); }
 
-  // Add roads - connect all Italian cities to Rome
-  for (auto city_vertex : std::ranges::subrange(map.vertex_range().begin() + 1, map.vertex_range().begin() + 5)) {
-    map.add_edge(city_vertex, city_vertices[0], std::make_shared<Road>(2));
+  /**
+   * @brief Gets the city's name.
+   * @return The name of the city
+   */
+  std::string name() const { return name_; }
+
+  /**
+   * @brief Checks if the city has a post office.
+   * @return true if the city has a post office, false otherwise
+   */
+  bool hasPostOffice() const { return has_post_office_; }
+
+  /**
+   * @brief Gets the city's population.
+   * @return The population of the city
+   */
+  int population() const { return population_; }
+
+  /**
+   * @brief Set city graph attributes. Necessary for subgraph DOT file
+   * generation.
+   * @return A map of attribute strings to their values
+   */
+  std::map<std::string, std::string, std::less<>> graphAttributes() final {
+    return std::map<std::string, std::string, std::less<>>{
+        {"label", std::format("City: {} Population: {}", name_, population_)}};
   }
-  // Add roads - connect all French cities to Paris
-  for (auto city_vertex : std::ranges::subrange(map.vertex_range().begin() + 6, map.vertex_range().begin() + 10)) {
-    map.add_edge(city_vertex, city_vertices[5], std::make_shared<Road>(2));
-  }
-  // Connect Milan to Lyon
-  map.add_edge(city_vertices[4], city_vertices[7], std::make_shared<Road>(2));
-  map.add_edge(city_vertices[7], city_vertices[4], std::make_shared<Road>(2));
+};
 
-  return map;
-}
+/**
+ * @class HUB
+ * @brief Represents a hub as a vertex property in a map graph.
+ *
+ * This class extends BaseNode to represent hubs in a map graph.
+ * HUB stands for an efficient road connection.
+ *
+ * Used in examples to demonstrate custom vertex properties and graph
+ * visualization. See examples/04_insert_hub.cpp
+ */
+class HUB : public ghl::BaseNode {
+
+public:
+  explicit HUB() {}
+
+  /**
+   * @brief Creates a clone of the hub.
+   *
+   * @return std::shared_ptr<BaseNode> Smart pointer to a new HUB instance
+   *         with the same properties
+   */
+  std::shared_ptr<BaseNode> clone() final { return std::make_shared<HUB>(); }
+
+  /**
+   * @brief Set city graph attributes. Necessary for subgraph DOT file
+   * generation.
+   * @return A map of attribute strings to their values
+   */
+  std::map<std::string, std::string, std::less<>> graphAttributes() final {
+    return std::map<std::string, std::string, std::less<>>{{"label", "HUB"}};
+  }
+};
+
+/**
+ * @class Road
+ * @brief Represents a road as an edge property in a map graph.
+ *
+ * This class extends PrimitiveEdge to represent roads connecting cities
+ * in a map graph. Each road has a property specifying the number of lanes,
+ * representing its capacity.
+ *
+ * Used in examples to demonstrate custom edge properties and graph
+ * visualization. See examples/01_graph.cpp and examples/04_insert_hub.cpp for usage examples.
+ */
+class Road : public ghl::PrimitiveEdge {
+  // Number of lanes in the road
+  int num_lanes_;
+
+public:
+  /**
+   * @brief Constructs a Road with specified number of lanes.
+   *
+   * @param num_lanes Number of lanes in the road
+   */
+  explicit Road(int num_lanes) : num_lanes_(num_lanes) {}
+
+  /**
+   * @brief Gets the number of lanes in the road.
+   * @return The number of lanes
+   */
+  int numLanes() const { return num_lanes_; }
+};
+
+// Type alias for vertex properties in the map graph
+using VertexProperty = std::shared_ptr<ghl::BaseNode>;
+
+// Type alias for edge properties in the map graph
+using EdgeProperty = std::shared_ptr<ghl::PrimitiveEdge>;
+
+/**
+ * @class MapGraph
+ * @brief ExtendedGraph specialization with custom DOT writers.
+ */
+class MapGraph : public ghl::DirectedExtendedGraph<VertexProperty, EdgeProperty> {
+  using Base = ghl::DirectedExtendedGraph<VertexProperty, EdgeProperty>;
+
+public:
+  using Base::Base;
+
+  void vertex_property_writer(std::ostream &out, const VertexDescriptor &v) const override {
+    auto city = std::dynamic_pointer_cast<City>(this->graph()[v]);
+    if (city) {
+      out << std::format("[label=\"City: {}\nPopulation: {}\"]", city->name(), city->population());
+    } else {
+      out << std::format("[label=\"HUB \"]");
+    }
+  }
+
+  void edge_property_writer(std::ostream &out, const EdgeDescriptor &e) const override {
+    auto road = std::dynamic_pointer_cast<Road>(this->graph()[e]);
+    out << std::format("[label=\"num lanes: {}\"]", road->numLanes());
+  }
+};
+
+using ImplementedIsomorphism = ghl::DirectedIsomorphism<VertexProperty, EdgeProperty>;
 
 /**
  * @class Capitals
@@ -104,7 +224,7 @@ public:
    * @brief Constructs the isomorphism with a pattern graph.
    * @param iso_graph Graph pattern to match for transformation
    */
-  explicit Capitals(const MapGraphType::GraphType &iso_graph, std::set<std::string> capitals)
+  explicit Capitals(const MapGraph::GraphType &iso_graph, std::set<std::string> capitals)
       : ImplementedIsomorphism(iso_graph), capitals_(capitals) {};
 
   /**
@@ -112,8 +232,8 @@ public:
    * @return Function implementing vertex comparison logic
    */
   VertexCompFunction vertex_comp_function() final {
-    return [this](const GraphType &iso_graph, const GraphType &target_graph, const TemplatedVertex iso_vertex,
-                  const TemplatedVertex target_vertex) {
+    return [this](const GraphType &iso_graph, const GraphType &target_graph, const VertexDescriptor iso_vertex,
+                  const VertexDescriptor target_vertex) {
       auto target_city = std::dynamic_pointer_cast<City>(target_graph[target_vertex]);
       return target_city && this->capitals_.find(target_city->name()) != this->capitals_.end();
     };
@@ -124,7 +244,7 @@ public:
    * @return Function implementing edge comparison logic
    */
   EdgeCompFunction edge_comp_function() final {
-    return [](const GraphType &, const GraphType &, const TemplatedEdge, const TemplatedEdge) { return true; };
+    return [](const GraphType &, const GraphType &, const EdgeDescriptor, const EdgeDescriptor) { return true; };
   }
 
   /**
@@ -140,7 +260,7 @@ public:
    */
   IsoMap specialize_isomorphism(const GraphType &graph, const IsoMap &isomorphism) final {
     IsoMap ret_iso;
-    TemplatedVertex iso_vertex = 0;
+    VertexDescriptor iso_vertex = 0;
     for (auto edge : b::make_iterator_range(b::in_edges(isomorphism.at(0)[0], graph))) {
       if (b::out_degree(b::source(edge, graph), graph) == 1) {
         ret_iso[iso_vertex].push_back(b::source(edge, graph));
@@ -214,7 +334,7 @@ public:
   ReconstructEdgesFunction reconstruct_edges_function() final {
     return [](const std::vector<TemplatedEdgeReplacementStruct> &external_incoming_edges,
               const std::vector<TemplatedEdgeReplacementStruct> &external_outgoing_edges,
-              const std::vector<TemplatedVertex> &, const std::vector<TemplatedVertex> &, GraphType &graph) {
+              const std::vector<VertexDescriptor> &, const std::vector<VertexDescriptor> &, GraphType &graph) {
       // Reconstruct incoming edges
       for (auto &[src, _old_trg, new_trg, i_edge_properties] : external_incoming_edges) {
         boost::add_edge(src, new_trg, i_edge_properties, graph);
@@ -229,33 +349,4 @@ public:
   }
 };
 
-/**
- * @brief Main function demonstrating graph transformation.
- *
- * Creates an initial graph where all roads lead to Rome, then applies
- * an isomorphism to transform it into a graph where cities are directly
- * connected to each other instead.
- *
- * @param argc Number of command line arguments
- * @param argv Array of command line argument strings
- * @return int Exit status code
- */
-int main(int argc, char *argv[]) {
-  // Create initial graph with roads leading to Rome
-  MapGraphType map = make_map();
-  std::filesystem::create_directories("output");
-  map.write_graph("output/original_graph");
-
-  // Create and apply the transformation
-  auto isomorphism_graph = ghl::Graph<VertexProperty, EdgeProperty>();
-  b::add_vertex(std::make_shared<City>("Capital", false, -1), isomorphism_graph);
-  std::set<std::string> capitals = {"Paris", "Rome"};
-  auto isomorphism = std::make_shared<Capitals>(isomorphism_graph, capitals);
-  ghl::apply_isomorphism<VertexProperty, EdgeProperty>(map, isomorphism, true, false);
-
-  // Output the transformed graph
-  map.write_graph("output/transformed_graph");
-  std::cout << std::format("Isomorphism run successfully and results stored in {}/output\n",
-                           std::filesystem::current_path().string());
-  return 0;
-}
+#endif

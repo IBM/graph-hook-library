@@ -56,64 +56,73 @@ namespace ghl {
  * The function operates iteratively, implementing the passed vector of previously found
  * isomorphisms. This enables comprehensive graph transformations that may require multiple passes.
  *
- * @tparam VertexProperties The type of properties stored in vertices
- * @tparam EdgeProperties The type of properties stored in edges
+ * @tparam ExtendedGraphT Extended graph wrapper type that owns the Boost graph.
  * @param graph The graph to transform
  * @param isomorphism The isomorphism object defining the transformation rules
  * @param isomorphisms The vector or view on the vector of previously found isomorphisms
  */
-template <typename VertexProperties, typename EdgeProperties = boost::no_property>
-void iterate_isomorphisms(ExtendedGraph<VertexProperties, EdgeProperties> &graph,
-                          std::shared_ptr<ghl::Isomorphism<VertexProperties, EdgeProperties>> isomorphism,
+template <typename ExtendedGraphT>
+void iterate_isomorphisms(std::shared_ptr<ExtendedGraphT> graph,
+                          std::shared_ptr<ghl::Isomorphism<typename ExtendedGraphT::VertexProperties,
+                                                           typename ExtendedGraphT::DirectionProperty,
+                                                           typename ExtendedGraphT::EdgeProperties>>
+                              isomorphism,
                           auto isomorphisms) {
-  using TemplatedVertex = Vertex<VertexProperties, EdgeProperties>;
-  std::set<TemplatedVertex, std::greater<>> vertices_to_remove;
+  using VertexDescriptor = ExtendedGraphT::VertexDescriptor;
+  std::set<VertexDescriptor, std::greater<>> vertices_to_remove;
   for (auto isomorphism_ : isomorphisms) {
     // Check if in-place update is available
     auto inplace_update_function = isomorphism->inplace_update_function();
     if (inplace_update_function.has_value()) {
       // Apply in-place transformation if defined
-      (*inplace_update_function)(graph.graph(), isomorphism_);
+      (*inplace_update_function)(graph->graph(), isomorphism->input_graph_, isomorphism_);
     } else {
       // Otherwise, perform constructive transformation
-      auto desired_graph = isomorphism->apply_isomorphism_to_graph(graph.graph(), isomorphism_);
+      auto desired_graph = isomorphism->apply_isomorphism_to_graph(graph->graph(), isomorphism_);
 
       // Construct new subgraph based on the transformation rules
       auto constructed_graph = isomorphism->construct_desired_graph(desired_graph, isomorphism_);
 
       // Replace the affected subgraph with the newly constructed one
       auto new_vertices_to_remove =
-          graph.replace_subgraph(constructed_graph, isomorphism_, isomorphism->reconstruct_edges_function());
+          graph->replace_subgraph(constructed_graph, isomorphism_, isomorphism->reconstruct_edges_function());
       vertices_to_remove.insert(new_vertices_to_remove.begin(), new_vertices_to_remove.end());
     }
   }
   for (auto vertex_to_remove : vertices_to_remove) {
-    b::clear_vertex(vertex_to_remove, graph.graph());
-    b::remove_vertex(vertex_to_remove, graph.graph());
+    b::clear_vertex(vertex_to_remove, graph->graph());
+    b::remove_vertex(vertex_to_remove, graph->graph());
   }
 }
 
 /**
- * @brief Finds and applies isomorphisms.
+ * @brief Discover and apply isomorphisms to a graph.
  *
- * This function implements finds isomorphisms and applies to the target graph.
+ * Repeatedly discovers subgraph matches in the target graph and applies the
+ * provided isomorphism rules until no further matches are found. When
+ * @p nonoverlapping is true, all disjoint matches are collected and applied in
+ * a single pass; when false, only the first match is applied each iteration,
+ * allowing overlapping matches across iterations. All discovered IsoMaps are
+ * returned.
  *
- * @tparam VertexProperties The type of properties stored in vertices
- * @tparam EdgeProperties The type of properties stored in edges
- * @param graph The graph to transform
- * @param isomorphism The isomorphism object defining the transformation rules
- * @param nonoverlapping If true, find isomorphisms one by one
- * @param use_vf3 If true, use the VF3 algorithm. If false, use VF2
+ * @tparam ExtendedGraphT The wrapped graph type to mutate.
+ * @param graph The graph to transform.
+ * @param isomorphism The isomorphism object defining the transformation rules.
+ * @param nonoverlapping When true, collect and apply all non-overlapping matches at once.
+ * @param use_vf3 If true, use the VF3 algorithm; otherwise use VF2.
+ * @return A vector of all IsoMaps discovered during the run.
  */
-template <typename VertexProperties, typename EdgeProperties = boost::no_property>
-void apply_isomorphism(ExtendedGraph<VertexProperties, EdgeProperties> &graph,
-                       std::shared_ptr<ghl::Isomorphism<VertexProperties, EdgeProperties>> isomorphism,
-                       bool nonoverlapping = true, bool use_vf3 = false) {
-
-  using GraphType = Graph<VertexProperties, EdgeProperties>;
-  using TemplatedVertex = Vertex<VertexProperties, EdgeProperties>;
-  using TemplatedEdge = Edge<VertexProperties, EdgeProperties>;
-  using IsoMap = std::map<TemplatedVertex, std::vector<TemplatedVertex>>;
+template <typename ExtendedGraphT>
+std::vector<std::map<typename ExtendedGraphT::VertexDescriptor, std::vector<typename ExtendedGraphT::VertexDescriptor>>>
+apply_isomorphism(std::shared_ptr<ExtendedGraphT> graph,
+                  std::shared_ptr<ghl::Isomorphism<typename ExtendedGraphT::VertexProperties,
+                                                   typename ExtendedGraphT::DirectionProperty,
+                                                   typename ExtendedGraphT::EdgeProperties>>
+                      isomorphism,
+                  bool nonoverlapping = true, bool use_vf3 = false) {
+  using VertexDescriptor = typename ExtendedGraphT::VertexDescriptor;
+  using IsoMap = std::map<VertexDescriptor, std::vector<VertexDescriptor>>;
+  std::vector<IsoMap> matched_isos;
   // Iterate until no more isomorphisms are found
   while (true) {
     isomorphism->reset_input_graph();
@@ -121,7 +130,7 @@ void apply_isomorphism(ExtendedGraph<VertexProperties, EdgeProperties> &graph,
 
     // Discover all possible isomorphisms in the current graph state
     std::vector<IsoMap> isomorphisms =
-        isomorphism->discover(input_graph, graph.graph(), !nonoverlapping, nonoverlapping, use_vf3);
+        isomorphism->discover(input_graph, graph->graph(), !nonoverlapping, nonoverlapping, use_vf3);
 
     // If no more isomorphisms are found, transformation is complete
     if (isomorphisms.empty()) {
@@ -131,14 +140,17 @@ void apply_isomorphism(ExtendedGraph<VertexProperties, EdgeProperties> &graph,
     if (nonoverlapping) {
       // Apply all isomorphisms at once
       iterate_isomorphisms(graph, isomorphism, isomorphisms);
+      matched_isos.insert(matched_isos.end(), isomorphisms.begin(), isomorphisms.end());
       break;
     } else {
       // Else, apply the first isomorphism
       iterate_isomorphisms(graph, isomorphism, std::ranges::subrange(isomorphisms.begin(), isomorphisms.begin() + 1));
+      matched_isos.insert(matched_isos.end(), isomorphisms.begin(), isomorphisms.begin() + 1);
     }
   }
   // Finalize vertex IDs
-  graph.fix_vertex_obj_ids();
+  graph->fix_vertex_obj_ids();
+  return matched_isos;
 }
 
 } // namespace ghl

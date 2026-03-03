@@ -1,4 +1,4 @@
-# Copyright (c) 2025 IBM
+# Copyright (c) 2026 IBM
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -18,21 +18,30 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-function(add_example name)
-    add_executable(${name} ${ARGN})
-    foreach(boost_lib ${BOOST_INCLUDE_LIBRARIES})
-        if(TARGET Boost::${boost_lib})
-            target_link_libraries(${name} PRIVATE Boost::${boost_lib})
-        endif()
-    endforeach()
-    if(GHL_BINDINGS)
-        target_link_libraries(${name} PUBLIC ${Python3_LIBRARIES})
-    endif()
-    target_link_libraries(${name} PRIVATE ghl::ghl)
-endfunction()
+import timeit
+import statistics
+import time
 
-file(GLOB BENCHMARK_SOURCES "*.cpp")
-foreach(benchmark_file ${BENCHMARK_SOURCES})
-    get_filename_component(benchmark_name ${benchmark_file} NAME_WE)
-    add_example(${benchmark_name} ${benchmark_file})
-endforeach()
+
+def benchmark(stmt, n, globals, debug=False):
+    timer = time.process_time
+    times = timeit.repeat(stmt, number=1, globals=globals, repeat=n, timer=timer)
+    print(f"Times: {times}")
+    stats_obj = {}
+    stats_obj["min"] = min(times)
+    stats_obj["max"] = max(times)
+    stats_obj["num_samples"] = len(times)
+    stats_obj["median"] = statistics.median(times)
+    stats_obj["mean"] = statistics.mean(times)
+    stats_obj["stdev"] = statistics.stdev(times) if len(times) > 1 else "N.A."
+    if debug:
+        print("Function:", stmt)
+        print("  --------------")
+        print(f"  Min:      {min(times)}")
+        print(f"  Median:   {statistics.median(times)}")
+        print(f"  Mean:     {statistics.mean(times)}")
+        print(f'  Stdev:    {statistics.stdev(times) if len(times) > 1 else "N.A."}')
+        print(f"  Max:      {max(times)}")
+        print("  --------------")
+        print(f"  samples:  {len(times)}")
+    return stats_obj
