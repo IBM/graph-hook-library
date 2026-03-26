@@ -79,13 +79,13 @@ template <typename T> using ModifyVertexPairFunction = std::function<void(T, T)>
 template <typename T> using CloneVertexFunction = std::function<T(T)>;
 
 /**
- * @struct generic_edge_descriptor
+ * @struct generic_vertex_pair
  * @brief Descriptor for defining an edge in the graph.
  *
  * @tparam T The type of the vertex identifier.
  * @tparam U The type of the edge properties (default: `boost::no_property`).
  */
-template <typename T, typename U = b::no_property> struct generic_edge_descriptor {
+template <typename T, typename U = b::no_property> struct generic_vertex_pair {
   T in_;         ///< Source vertex identifier.
   T out_;        ///< Target vertex identifier.
   U properties_; ///< Properties associated with the edge.
@@ -170,7 +170,7 @@ struct EdgeReplacementStruct {
  * @return A constructed graph of type `Graph<T, E>`.
  */
 template <typename T, typename D, typename E = b::no_property>
-Graph<T, D, E> construct_graph(std::vector<T> vertex_vector, std::vector<generic_edge_descriptor<int, E>> vertex_eds) {
+Graph<T, D, E> construct_graph(std::vector<T> vertex_vector, std::vector<generic_vertex_pair<int, E>> vertex_eds) {
   using GraphType = Graph<T, D, E>;
   using VertexDescriptor = typename GraphType::vertex_descriptor;
   GraphType g;
@@ -203,18 +203,18 @@ Graph<T, D, E> construct_graph(std::vector<T> vertex_vector, std::vector<generic
  * descriptors.
  */
 template <typename T, typename D, typename E = b::no_property>
-std::pair<std::vector<T>, std::vector<generic_edge_descriptor<int, E>>> deconstruct_graph(Graph<T, D, E> g) {
+std::pair<std::vector<T>, std::vector<generic_vertex_pair<int, E>>> deconstruct_graph(Graph<T, D, E> g) {
   using GraphType = Graph<T, D, E>;
   using VertexDescriptor = typename GraphType::vertex_descriptor;
   using EdgeDescriptor = typename GraphType::edge_descriptor;
   std::vector<T> vertex_vector;
   vertex_vector.resize(b::num_vertices(g));
-  std::vector<generic_edge_descriptor<int, E>> vertex_eds;
+  std::vector<generic_vertex_pair<int, E>> vertex_eds;
   for (VertexDescriptor vertex : b::make_iterator_range(b::vertices(g))) {
     vertex_vector.at(g[vertex]->id()) = g[vertex];
   }
   for (EdgeDescriptor edge : b::make_iterator_range(b::edges(g))) {
-    vertex_eds.push_back(generic_edge_descriptor<int, E>(g[source(edge, g)]->id(), g[target(edge, g)]->id(), g[edge]));
+    vertex_eds.push_back(generic_vertex_pair<int, E>(g[source(edge, g)]->id(), g[target(edge, g)]->id(), g[edge]));
   }
   return std::make_pair(vertex_vector, vertex_eds);
 }
