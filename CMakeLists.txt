@@ -70,6 +70,9 @@ include(cmake/GitUtils.cmake)
 # boost
 set(BOOST_INCLUDE_LIBRARIES "graph")
 
+get_property(all_targets GLOBAL PROPERTY TARGETS)
+message(STATUS "Targets so far: ${all_targets}")
+
 if(NOT TARGET boost_graph)
   CPMAddPackage(
     NAME Boost
@@ -213,10 +216,15 @@ endif()
 
 if(GHL_BINDINGS)
   find_package(Python3 COMPONENTS Interpreter Development)
-  find_package(pybind11 CONFIG REQUIRED HINTS "${Python3_SITELIB}")
-  include_directories(${Python3_INCLUDE_DIRS})
-  find_library(pybind11_lib pybind11::lto)
-
+  get_property(all_targets GLOBAL PROPERTY TARGETS)
+  message(STATUS "Targets so far: ${all_targets}")
+  if(NOT TARGET pybind11::module)
+    find_package(pybind11 CONFIG REQUIRED HINTS "${Python3_SITELIB}")
+    include_directories(${Python3_INCLUDE_DIRS})
+    find_library(pybind11_lib pybind11::lto)
+  else()
+    message("Found previous target pybind11")
+  endif()
   pybind11_add_module(ghl_bindings include/ghl/bindings/graph_bindings.cpp)
 
   foreach(boost_lib ${BOOST_INCLUDE_LIBRARIES})
