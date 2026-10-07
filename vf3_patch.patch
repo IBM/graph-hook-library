@@ -1026,3 +1026,24 @@ index 00000000..d5b25292
 +#endif
 +
 +#endif // BOOST_VF3_SUB_GRAPH_ISO_HPP
+diff --git a/libs/serialization/src/codecvt_null.cpp b/libs/serialization/src/codecvt_null.cpp
+--- a/libs/serialization/src/codecvt_null.cpp
++++ b/libs/serialization/src/codecvt_null.cpp
+@@ -10,6 +10,7 @@
+ #define BOOST_WARCHIVE_SOURCE
+ #include <boost/serialization/config.hpp>
+ #include <boost/archive/codecvt_null.hpp>
++#include <cstring>
+ 
+ // codecvt implementation for passing wchar_t objects to char output
+ // without any translation whatever.  Used to implement binary output
+@@ -37,7 +38,8 @@
+             next2 = first2;
+             return std::codecvt_base::partial;
+         }
+-        * reinterpret_cast<wchar_t *>(first2) = * first1++;
++        std::memcpy(first2, first1, sizeof(wchar_t));
++        ++first1;
+         first2 += sizeof(wchar_t);
+ 
+     }
