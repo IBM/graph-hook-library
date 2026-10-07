@@ -44,7 +44,7 @@ jobs:
         include:
           - language: c-cpp
             build-mode: autobuild
-          - lanauge: python
+          - langauge: python
             build-mode: none
     steps:
     - name: Checkout repository
