@@ -70,8 +70,6 @@ include(cmake/GitUtils.cmake)
 # boost
 set(BOOST_INCLUDE_LIBRARIES "graph")
 
-get_property(all_targets GLOBAL PROPERTY TARGETS)
-message(STATUS "Targets so far: ${all_targets}")
 
 if(NOT TARGET boost_graph)
   CPMAddPackage(
@@ -216,8 +214,6 @@ endif()
 
 if(GHL_BINDINGS)
   find_package(Python3 COMPONENTS Interpreter Development)
-  get_property(all_targets GLOBAL PROPERTY TARGETS)
-  message(STATUS "Targets so far: ${all_targets}")
   if(NOT TARGET pybind11::module)
     find_package(pybind11 CONFIG REQUIRED HINTS "${Python3_SITELIB}")
     include_directories(${Python3_INCLUDE_DIRS})
